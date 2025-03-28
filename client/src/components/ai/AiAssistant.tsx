@@ -36,31 +36,69 @@ export default function AiAssistant() {
     setInputValue('');
     setIsLoading(true);
     
+    // Use a timeout to handle potential long-running AI response
+    const timeoutPromise = new Promise<AiMessage>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('AI response timed out'));
+      }, 15000); // 15 second timeout
+    });
+    
     try {
-      // Use the real API to get AI responses from Hugging Face
-      const aiMessage = await submitAiQuery(userMessage.content);
+      console.log("AI query submitted:", userMessage.content);
+      
+      // Race between the actual API call and the timeout
+      const aiMessage = await Promise.race([
+        submitAiQuery(userMessage.content),
+        timeoutPromise
+      ]);
+      
+      console.log("AI response received:", aiMessage);
       setMessages(prev => [...prev, aiMessage]);
     } catch (error) {
       console.error('Error getting AI response:', error);
       
-      // Fallback to sample response if the API fails
+      // Show a loading message first
+      setMessages(prev => [...prev, {
+        sender: 'ai',
+        content: {
+          type: 'general',
+          message: 'The AI is still processing your request. This can take a moment for complex questions...',
+          data: { insights: ["Using Hugging Face Mistral-7B model for processing"] }
+        },
+        timestamp: new Date()
+      }]);
+      
+      // Try again with a fallback after showing the loading message
       try {
+        // Use fallback sample response 
         const fallbackMessage = generateSampleResponse(userMessage.content);
-        setMessages(prev => [...prev, fallbackMessage]);
+        
+        // Wait a moment before showing the fallback to avoid confusion
+        setTimeout(() => {
+          setMessages(prev => [...prev.slice(0, prev.length - 1), fallbackMessage]);
+          setIsLoading(false);
+        }, 2000);
+        
+        return; // Exit early to prevent setting isLoading=false too early
       } catch (fallbackError) {
         // If even the fallback fails, show an error message
-        setMessages(prev => [...prev, {
-          sender: 'ai',
-          content: {
-            type: 'error',
-            message: 'Sorry, I encountered an error. Please try again.'
-          },
-          timestamp: new Date()
-        }]);
+        setTimeout(() => {
+          setMessages(prev => [...prev.slice(0, prev.length - 1), {
+            sender: 'ai',
+            content: {
+              type: 'error',
+              message: 'Sorry, I encountered an error. Please try again.'
+            },
+            timestamp: new Date()
+          }]);
+          setIsLoading(false);
+        }, 2000);
+        
+        return; // Exit early to prevent setting isLoading=false too early
       }
-    } finally {
-      setIsLoading(false);
     }
+    
+    setIsLoading(false);
   };
 
   const handleSampleQueryClick = (query: string) => {

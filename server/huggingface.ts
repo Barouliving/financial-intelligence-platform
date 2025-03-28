@@ -32,21 +32,44 @@ export async function generateText(
       model = DEFAULT_MODEL,
     } = options;
 
-    const response = await hf.textGeneration({
-      model: model,
-      inputs: prompt,
-      parameters: {
-        max_new_tokens: maxTokens,
-        temperature: temperature,
-        top_p: topP,
-        return_full_text: false,
-      }
+    console.log(`Generating text using model: ${model}`);
+    console.log(`Prompt length: ${prompt.length} characters`);
+    
+    // Create a timeout promise that rejects after 25 seconds
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('Request to Hugging Face API timed out after 25 seconds'));
+      }, 25000);
     });
+    
+    // Race between the HF request and the timeout
+    const response = await Promise.race([
+      hf.textGeneration({
+        model: model,
+        inputs: prompt,
+        parameters: {
+          max_new_tokens: maxTokens,
+          temperature: temperature,
+          top_p: topP,
+          return_full_text: false,
+        }
+      }),
+      timeoutPromise
+    ]);
 
+    console.log(`Generated response length: ${response.generated_text.length} characters`);
     return response.generated_text;
   } catch (error) {
     console.error('Error generating text with Hugging Face:', error);
-    throw new Error('Failed to generate AI response');
+    if (error.message?.includes('timed out')) {
+      throw new Error('The AI model took too long to respond. Please try a simpler query.');
+    } else if (error.message?.includes('401')) {
+      throw new Error('Authentication error with AI provider. Please check your API token.');
+    } else if (error.message?.includes('429')) {
+      throw new Error('Too many requests to the AI service. Please try again in a moment.');
+    } else {
+      throw new Error('Failed to generate AI response: ' + (error.message || 'Unknown error'));
+    }
   }
 }
 
