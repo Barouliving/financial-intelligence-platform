@@ -6,13 +6,33 @@ import {
   categories, type Category, type InsertCategory,
   transactions, type Transaction, type InsertTransaction,
   anomalies, type Anomaly, type InsertAnomaly,
-  reports, type Report, type InsertReport
+  reports, type Report, type InsertReport,
+  organizations, type Organization, type InsertOrganization,
+  documents, type Document, type InsertDocument
 } from "@shared/schema";
 
+import session from "express-session";
+
 export interface IStorage {
+  // Session management
+  sessionStore: session.Store;
+  
+  // Users
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  
+  // Organizations
+  getOrganization?(id: number): Promise<Organization | undefined>;
+  getOrganizationBySlug?(slug: string): Promise<Organization | undefined>;
+  createOrganization?(organization: InsertOrganization): Promise<Organization>;
+  updateOrganization?(id: number, updates: Partial<InsertOrganization>): Promise<Organization | undefined>;
+  
+  // Documents
+  createDocument?(document: InsertDocument): Promise<Document>;
+  getDocument?(id: number): Promise<Document | undefined>;
+  getDocuments?(organizationId: number): Promise<Document[]>;
+  updateDocument?(id: number, updates: Partial<InsertDocument>): Promise<Document | undefined>;
   
   // Demo requests
   createDemoRequest(request: InsertDemoRequest): Promise<DemoRequest>;
@@ -26,19 +46,20 @@ export interface IStorage {
   
   // Accounts
   createAccount(account: InsertAccount): Promise<Account>;
-  getAccounts(): Promise<Account[]>;
+  getAccounts(organizationId?: number): Promise<Account[]>;
   getAccount(id: number): Promise<Account | undefined>;
   updateAccount(id: number, updates: Partial<InsertAccount>): Promise<Account | undefined>;
   
   // Categories
   createCategory(category: InsertCategory): Promise<Category>;
-  getCategories(): Promise<Category[]>;
+  getCategories(organizationId?: number): Promise<Category[]>;
   getCategory(id: number): Promise<Category | undefined>;
-  getCategoryByName(name: string): Promise<Category | undefined>;
+  getCategoryByName(name: string, organizationId?: number): Promise<Category | undefined>;
   
   // Transactions
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   getTransactions(filters?: {
+    organizationId?: number;
     startDate?: Date;
     endDate?: Date;
     categoryId?: number;
@@ -51,13 +72,13 @@ export interface IStorage {
   
   // Anomalies
   createAnomaly(anomaly: InsertAnomaly): Promise<Anomaly>;
-  getAnomalies(status?: string): Promise<Anomaly[]>;
+  getAnomalies(status?: string, organizationId?: number): Promise<Anomaly[]>;
   getAnomaly(id: number): Promise<Anomaly | undefined>;
   updateAnomalyStatus(id: number, status: string): Promise<Anomaly | undefined>;
   
   // Reports
   createReport(report: InsertReport): Promise<Report>;
-  getReports(): Promise<Report[]>;
+  getReports(organizationId?: number): Promise<Report[]>;
   getReport(id: number): Promise<Report | undefined>;
   generateReportWithAI(id: number): Promise<Report | undefined>;
 }
@@ -622,4 +643,7 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+import { DatabaseStorage } from "./database-storage";
+
+// Create instance of DatabaseStorage as the application's storage provider
+export const storage = new DatabaseStorage();
