@@ -37,28 +37,29 @@ export default function AiAssistant() {
     setIsLoading(true);
     
     try {
-      // Use the mock response here, in a real app we would call the actual API
-      // const aiMessage = await submitAiQuery(userMessage.content);
-      
-      // For demo, use the sample response
-      setTimeout(() => {
-        const aiMessage = generateSampleResponse(userMessage.content);
-        setMessages(prev => [...prev, aiMessage]);
-        setIsLoading(false);
-      }, 1500);
+      // Use the real API to get AI responses from Hugging Face
+      const aiMessage = await submitAiQuery(userMessage.content);
+      setMessages(prev => [...prev, aiMessage]);
     } catch (error) {
       console.error('Error getting AI response:', error);
-      setIsLoading(false);
       
-      // Add error message
-      setMessages(prev => [...prev, {
-        sender: 'ai',
-        content: {
-          type: 'error',
-          message: 'Sorry, I encountered an error. Please try again.'
-        },
-        timestamp: new Date()
-      }]);
+      // Fallback to sample response if the API fails
+      try {
+        const fallbackMessage = generateSampleResponse(userMessage.content);
+        setMessages(prev => [...prev, fallbackMessage]);
+      } catch (fallbackError) {
+        // If even the fallback fails, show an error message
+        setMessages(prev => [...prev, {
+          sender: 'ai',
+          content: {
+            type: 'error',
+            message: 'Sorry, I encountered an error. Please try again.'
+          },
+          timestamp: new Date()
+        }]);
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 

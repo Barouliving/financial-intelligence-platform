@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertDemoRequestSchema, insertAiConversationSchema } from "@shared/schema";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
+import { processBusinessQuery } from "./huggingface";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Demo Request API
@@ -34,15 +35,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // AI Conversation API
   app.post("/api/ai/conversation", async (req: Request, res: Response) => {
     try {
-      // For demo purposes, we'll create a simulated AI response
       const { query } = req.body;
       
       if (!query) {
         return res.status(400).json({ success: false, error: "Query is required" });
       }
 
-      // Generate a simulated response based on the query
-      const response = generateAiResponse(query);
+      // Generate AI response using Hugging Face
+      let response;
+      try {
+        // Use Hugging Face if API token is available
+        if (process.env.HF_API_TOKEN) {
+          console.log("Using Hugging Face for AI response");
+          response = await processBusinessQuery(query);
+        } else {
+          // Fallback to the local mock data
+          console.log("Using mock data for AI response (no API token)");
+          response = generateAiResponse(query);
+        }
+      } catch (aiError) {
+        console.error("Error calling AI API:", aiError);
+        // Fallback to the local mock data if AI API fails
+        response = generateAiResponse(query);
+      }
       
       const conversation = await storage.createAiConversation({
         userId: req.body.userId || null,
@@ -56,6 +71,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const validationError = fromZodError(error);
         res.status(400).json({ success: false, error: validationError.message });
       } else {
+        console.error("Error in AI conversation endpoint:", error);
         res.status(500).json({ success: false, error: "Internal server error" });
       }
     }
