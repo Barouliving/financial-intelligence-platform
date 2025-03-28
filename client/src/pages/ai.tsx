@@ -80,7 +80,7 @@ export default function AI() {
   ];
 
   const mockAiConversation = [
-    { role: 'user', content: 'What's our revenue forecast for Q3?' },
+    { role: 'user', content: "What's our revenue forecast for Q3?" },
     { role: 'ai', content: 'Based on the current data and market trends, your Q3 revenue is projected to be $5.7M, which is 8.5% above target. North America is the strongest region at 12% above forecasts, while EMEA is currently 5% below target.' },
     { role: 'user', content: 'Why is EMEA underperforming?' },
     { role: 'ai', content: 'The main factors affecting EMEA performance are:\n\n1. Delayed product launch (impact: -3.2%)\n2. Increased competitive pressure in UK market\n3. Currency exchange fluctuations (-1.8%)\n\nRecommended action: Consider accelerating the product launch timeline and implementing a hedging strategy for EUR/GBP.' }
