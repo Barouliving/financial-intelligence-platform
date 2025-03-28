@@ -59,16 +59,19 @@ export async function generateText(
 
     console.log(`Generated response length: ${response.generated_text.length} characters`);
     return response.generated_text;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error generating text with Hugging Face:', error);
-    if (error.message?.includes('timed out')) {
+    
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    if (errorMessage.includes('timed out')) {
       throw new Error('The AI model took too long to respond. Please try a simpler query.');
-    } else if (error.message?.includes('401')) {
+    } else if (errorMessage.includes('401')) {
       throw new Error('Authentication error with AI provider. Please check your API token.');
-    } else if (error.message?.includes('429')) {
+    } else if (errorMessage.includes('429')) {
       throw new Error('Too many requests to the AI service. Please try again in a moment.');
     } else {
-      throw new Error('Failed to generate AI response: ' + (error.message || 'Unknown error'));
+      throw new Error('Failed to generate AI response: ' + errorMessage);
     }
   }
 }
@@ -187,7 +190,7 @@ export async function processBusinessQuery(query: string): Promise<string> {
         }
       });
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error processing business query:', error);
     throw error;
   }

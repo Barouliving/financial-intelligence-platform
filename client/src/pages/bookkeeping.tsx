@@ -33,29 +33,29 @@ export default function Bookkeeping() {
   // Fetch accounts
   const { data: accounts, isLoading: isLoadingAccounts } = useQuery({
     queryKey: ['/api/bookkeeping/accounts'],
-    queryFn: () => apiRequest('/api/bookkeeping/accounts', {}, { on401: "returnNull" })
-      .then(res => res.data)
+    queryFn: () => apiRequest('/api/bookkeeping/accounts', { method: 'GET' }, { on401: "returnNull" })
+      .then(res => res.json())
   });
   
   // Fetch categories
   const { data: categories, isLoading: isLoadingCategories } = useQuery({
     queryKey: ['/api/bookkeeping/categories'],
-    queryFn: () => apiRequest('/api/bookkeeping/categories', {}, { on401: "returnNull" })
-      .then(res => res.data)
+    queryFn: () => apiRequest('/api/bookkeeping/categories', { method: 'GET' }, { on401: "returnNull" })
+      .then(res => res.json())
   });
   
   // Fetch transactions
   const { data: transactions, isLoading: isLoadingTransactions } = useQuery({
     queryKey: ['/api/bookkeeping/transactions'],
-    queryFn: () => apiRequest('/api/bookkeeping/transactions', {}, { on401: "returnNull" })
-      .then(res => res.data)
+    queryFn: () => apiRequest('/api/bookkeeping/transactions', { method: 'GET' }, { on401: "returnNull" })
+      .then(res => res.json())
   });
   
   // Fetch anomalies
   const { data: anomalies, isLoading: isLoadingAnomalies } = useQuery({
     queryKey: ['/api/bookkeeping/anomalies'],
-    queryFn: () => apiRequest('/api/bookkeeping/anomalies', {}, { on401: "returnNull" })
-      .then(res => res.data)
+    queryFn: () => apiRequest('/api/bookkeeping/anomalies', { method: 'GET' }, { on401: "returnNull" })
+      .then(res => res.json())
   });
   
   // Submit AI bookkeeping query
@@ -67,10 +67,15 @@ export default function Bookkeeping() {
     try {
       const response = await apiRequest('/api/ai/conversation', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ query: aiQuery })
       }, { on401: "returnNull" });
       
-      if (response?.success) {
+      const responseData = await response.json();
+      
+      if (responseData.success) {
         toast({
           title: "AI Response Generated",
           description: "The AI has processed your bookkeeping query."
@@ -78,7 +83,7 @@ export default function Bookkeeping() {
         
         // Parse the AI response
         try {
-          const parsedResponse = JSON.parse(response.data.response);
+          const parsedResponse = JSON.parse(responseData.response);
           displayAiResponse(parsedResponse);
         } catch (error) {
           console.error("Error parsing AI response:", error);
