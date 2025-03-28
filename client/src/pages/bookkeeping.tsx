@@ -12,18 +12,23 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { 
-  ArrowDownIcon, 
-  ArrowUpIcon, 
-  CreditCardIcon, 
-  DollarSignIcon, 
-  SearchIcon, 
-  AlertCircleIcon,
-  BarChartIcon,
-  TagIcon,
-  FileTextIcon
+  ArrowDown, 
+  ArrowUp, 
+  CreditCard, 
+  DollarSign, 
+  Search, 
+  AlertCircle,
+  BarChart,
+  Tag,
+  FileText
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
+
+// Import our bookkeeping components
+import DataImportPanel from "@/components/bookkeeping/DataImportPanel";
+import TransactionCategorizationPanel from "@/components/bookkeeping/TransactionCategorizationPanel";
+import AnomalyDetectionPanel from "@/components/bookkeeping/AnomalyDetectionPanel";
 
 export default function Bookkeeping() {
   const [aiQuery, setAiQuery] = useState("");
@@ -149,7 +154,7 @@ export default function Bookkeeping() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center">
-                  <DollarSignIcon className="mr-2 h-4 w-4 text-green-500" />
+                  <DollarSign className="mr-2 h-4 w-4 text-green-500" />
                   <span className="text-2xl font-bold">${financialMetrics.cashBalance.toLocaleString()}</span>
                 </div>
               </CardContent>
@@ -161,7 +166,7 @@ export default function Bookkeeping() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center">
-                  <ArrowDownIcon className="mr-2 h-4 w-4 text-blue-500" />
+                  <ArrowDown className="mr-2 h-4 w-4 text-blue-500" />
                   <span className="text-2xl font-bold">${financialMetrics.accountsReceivable.toLocaleString()}</span>
                 </div>
               </CardContent>
@@ -173,7 +178,7 @@ export default function Bookkeeping() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center">
-                  <ArrowUpIcon className="mr-2 h-4 w-4 text-orange-500" />
+                  <ArrowUp className="mr-2 h-4 w-4 text-orange-500" />
                   <span className="text-2xl font-bold">${financialMetrics.accountsPayable.toLocaleString()}</span>
                 </div>
               </CardContent>
@@ -187,7 +192,7 @@ export default function Bookkeeping() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center">
-                  <CreditCardIcon className="mr-2 h-4 w-4 text-purple-500" />
+                  <CreditCard className="mr-2 h-4 w-4 text-purple-500" />
                   <span className="text-2xl font-bold">{financialMetrics.pendingTransactions}</span>
                 </div>
               </CardContent>
@@ -199,7 +204,7 @@ export default function Bookkeeping() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center">
-                  <SearchIcon className="mr-2 h-4 w-4 text-yellow-500" />
+                  <Search className="mr-2 h-4 w-4 text-yellow-500" />
                   <span className="text-2xl font-bold">{financialMetrics.unreconciledItems}</span>
                 </div>
               </CardContent>
@@ -211,137 +216,48 @@ export default function Bookkeeping() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center">
-                  <AlertCircleIcon className="mr-2 h-4 w-4 text-red-500" />
+                  <AlertCircle className="mr-2 h-4 w-4 text-red-500" />
                   <span className="text-2xl font-bold">{financialMetrics.anomalies}</span>
                 </div>
               </CardContent>
             </Card>
           </div>
           
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent AI Insights</CardTitle>
-              <CardDescription>AI-generated insights about your financial data</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2">
-                <li className="flex items-start gap-2">
-                  <BarChartIcon className="h-5 w-5 text-blue-500 mt-0.5" />
-                  <span>March expenses are 12% higher than February, primarily due to increased software subscription costs.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <TagIcon className="h-5 w-5 text-green-500 mt-0.5" />
-                  <span>7 transactions totaling $3,240 were automatically categorized this week based on pattern recognition.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <AlertCircleIcon className="h-5 w-5 text-red-500 mt-0.5" />
-                  <span>Potential duplicate payment detected: Two similar transactions to "Acme Services" within 48 hours.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <FileTextIcon className="h-5 w-5 text-purple-500 mt-0.5" />
-                  <span>Based on current trends, Q2 tax liability is projected to be approximately $8,500.</span>
-                </li>
-              </ul>
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <DataImportPanel />
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent AI Insights</CardTitle>
+                <CardDescription>AI-generated insights about your financial data</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  <li className="flex items-start gap-2">
+                    <BarChart className="h-5 w-5 text-blue-500 mt-0.5" />
+                    <span>March expenses are 12% higher than February, primarily due to increased software subscription costs.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Tag className="h-5 w-5 text-green-500 mt-0.5" />
+                    <span>7 transactions totaling $3,240 were automatically categorized this week based on pattern recognition.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <AlertCircle className="h-5 w-5 text-red-500 mt-0.5" />
+                    <span>Potential duplicate payment detected: Two similar transactions to "Acme Services" within 48 hours.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <FileText className="h-5 w-5 text-purple-500 mt-0.5" />
+                    <span>Based on current trends, Q2 tax liability is projected to be approximately $8,500.</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
         
         {/* Transactions Tab */}
         <TabsContent value="transactions" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Transactions</CardTitle>
-              <CardDescription>Your latest financial transactions</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoadingTransactions ? (
-                <div className="text-center py-4">Loading transactions...</div>
-              ) : transactions && transactions.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-2 px-2">Description</th>
-                        <th className="text-left py-2 px-2">Date</th>
-                        <th className="text-left py-2 px-2">Amount</th>
-                        <th className="text-left py-2 px-2">Category</th>
-                        <th className="text-left py-2 px-2">Status</th>
-                        <th className="text-left py-2 px-2">AI Processed</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {/* Placeholder transactions */}
-                      <tr className="border-b hover:bg-muted/50">
-                        <td className="py-2 px-2">Software Subscription</td>
-                        <td className="py-2 px-2">Mar 25, 2025</td>
-                        <td className="py-2 px-2 text-red-500">-$199.99</td>
-                        <td className="py-2 px-2">Software</td>
-                        <td className="py-2 px-2">
-                          <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">Reconciled</span>
-                        </td>
-                        <td className="py-2 px-2">
-                          <span className="text-green-500">✓</span>
-                        </td>
-                      </tr>
-                      <tr className="border-b hover:bg-muted/50">
-                        <td className="py-2 px-2">Client Payment - XYZ Corp</td>
-                        <td className="py-2 px-2">Mar 22, 2025</td>
-                        <td className="py-2 px-2 text-green-500">+$5,750.00</td>
-                        <td className="py-2 px-2">Revenue</td>
-                        <td className="py-2 px-2">
-                          <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">Reconciled</span>
-                        </td>
-                        <td className="py-2 px-2">
-                          <span className="text-green-500">✓</span>
-                        </td>
-                      </tr>
-                      <tr className="border-b hover:bg-muted/50">
-                        <td className="py-2 px-2">Office Rent</td>
-                        <td className="py-2 px-2">Mar 18, 2025</td>
-                        <td className="py-2 px-2 text-red-500">-$2,500.00</td>
-                        <td className="py-2 px-2">Rent</td>
-                        <td className="py-2 px-2">
-                          <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">Reconciled</span>
-                        </td>
-                        <td className="py-2 px-2">
-                          <span className="text-green-500">✓</span>
-                        </td>
-                      </tr>
-                      <tr className="border-b hover:bg-muted/50">
-                        <td className="py-2 px-2">Marketing Services</td>
-                        <td className="py-2 px-2">Mar 15, 2025</td>
-                        <td className="py-2 px-2 text-red-500">-$1,250.00</td>
-                        <td className="py-2 px-2">Marketing</td>
-                        <td className="py-2 px-2">
-                          <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">Pending</span>
-                        </td>
-                        <td className="py-2 px-2">
-                          <Button size="sm" variant="outline">Process with AI</Button>
-                        </td>
-                      </tr>
-                      <tr className="border-b hover:bg-muted/50">
-                        <td className="py-2 px-2">Consulting Income</td>
-                        <td className="py-2 px-2">Mar 10, 2025</td>
-                        <td className="py-2 px-2 text-green-500">+$3,200.00</td>
-                        <td className="py-2 px-2">Revenue</td>
-                        <td className="py-2 px-2">
-                          <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">Pending</span>
-                        </td>
-                        <td className="py-2 px-2">
-                          <Button size="sm" variant="outline">Process with AI</Button>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="text-center py-4">
-                  <p>No transactions found.</p>
-                  <Button className="mt-2" variant="outline">Add Transaction</Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <TransactionCategorizationPanel />
         </TabsContent>
         
         {/* Accounts Tab */}
@@ -459,79 +375,7 @@ export default function Bookkeeping() {
         
         {/* Anomalies Tab */}
         <TabsContent value="anomalies" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>AI-Detected Anomalies</CardTitle>
-              <CardDescription>Unusual transactions that require your attention</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoadingAnomalies ? (
-                <div className="text-center py-4">Loading anomalies...</div>
-              ) : (
-                <ul className="space-y-4">
-                  <li>
-                    <Card className="border-red-200">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-md flex items-center">
-                          <AlertCircleIcon className="mr-2 h-5 w-5 text-red-500" />
-                          <span>Unusually Large Payment</span>
-                        </CardTitle>
-                        <CardDescription>Transaction #42 on March 15, 2025</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="mb-2">Payment of <strong>$15,750.00</strong> to "Unknown Vendor LLC" is 350% higher than average payments in this category.</p>
-                        <p className="text-sm text-muted-foreground mb-3">AI Confidence: 89%</p>
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline">Dismiss</Button>
-                          <Button size="sm" variant="default">Review Transaction</Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </li>
-                  
-                  <li>
-                    <Card className="border-amber-200">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-md flex items-center">
-                          <AlertCircleIcon className="mr-2 h-5 w-5 text-amber-500" />
-                          <span>Potential Duplicate Payment</span>
-                        </CardTitle>
-                        <CardDescription>Transaction #57 on March 22, 2025</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="mb-2">Payment of <strong>$2,450.00</strong> to "Acme Services" matches a similar transaction from March 21.</p>
-                        <p className="text-sm text-muted-foreground mb-3">AI Confidence: 94%</p>
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline">Dismiss</Button>
-                          <Button size="sm" variant="default">Compare Transactions</Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </li>
-                  
-                  <li>
-                    <Card className="border-amber-200">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-md flex items-center">
-                          <AlertCircleIcon className="mr-2 h-5 w-5 text-amber-500" />
-                          <span>Unusual Transaction Timing</span>
-                        </CardTitle>
-                        <CardDescription>Transaction #63 on March 27, 2025</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="mb-2">Payment of <strong>$5,200.00</strong> processed at 3:42 AM, outside normal business hours.</p>
-                        <p className="text-sm text-muted-foreground mb-3">AI Confidence: 71%</p>
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline">Dismiss</Button>
-                          <Button size="sm" variant="default">Review Transaction</Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </li>
-                </ul>
-              )}
-            </CardContent>
-          </Card>
+          <AnomalyDetectionPanel />
         </TabsContent>
         
         {/* AI Assistant Tab */}
