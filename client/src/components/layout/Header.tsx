@@ -19,6 +19,7 @@ export default function Header() {
     { name: 'Features', href: '/#features' },
     { name: 'AI', href: '/ai' },
     { name: 'Dashboard', href: '/dashboard' },
+    { name: 'Bookkeeping', href: '/bookkeeping' },
     { name: 'Pricing', href: '/pricing' },
     { name: 'Resources', href: '/resources' }
   ];

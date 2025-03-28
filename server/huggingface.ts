@@ -80,7 +80,48 @@ export async function generateText(
  * @returns A formatted prompt for the AI model
  */
 export function createBusinessPrompt(query: string): string {
-  return `You are an AI business intelligence assistant for Pigment, a business planning platform.
+  const lowercaseQuery = query.toLowerCase();
+  
+  // Check if the query is related to bookkeeping
+  if (lowercaseQuery.includes('transaction') || 
+      lowercaseQuery.includes('categoriz') || 
+      lowercaseQuery.includes('anomal') || 
+      lowercaseQuery.includes('expense') || 
+      lowercaseQuery.includes('tax') || 
+      lowercaseQuery.includes('cash flow') || 
+      lowercaseQuery.includes('bookkeep') ||
+      lowercaseQuery.includes('account') ||
+      lowercaseQuery.includes('reconcil') ||
+      lowercaseQuery.includes('audit') ||
+      lowercaseQuery.includes('financial')) {
+    
+    return `You are an AI bookkeeping assistant for Pigment, a business planning and financial management platform.
+You have access to company transaction data, accounts, categories, and financial reports.
+Analyze the following query related to bookkeeping or financial management and provide a detailed, accurate response.
+
+Format your response as a JSON object with the following structure:
+{
+  "type": "anomaly" | "categorization" | "tax" | "cashflow" | "financial_health" | "general",
+  "message": "A short summary message",
+  "data": {
+    // Response-specific structured data that includes:
+    // For anomalies: detected unusual transactions with reasoning
+    // For categorization: transaction categories with amounts and percentages
+    // For tax analysis: deduction categories, eligibility, and insights
+    // For cash flow: current position data, trends, and recommendations
+    // For financial health: key ratios, performance metrics, and insights
+    // For general: insights array with financial observations
+  }
+}
+
+Today's date is March 28, 2025.
+
+User query: ${query}
+
+JSON response:`;
+  } else {
+    // Default business intelligence prompt
+    return `You are an AI business intelligence assistant for Pigment, a business planning platform.
 Analyze the following query and provide a detailed, data-driven response with business insights.
 If the query relates to financial forecasting, revenue, or regional performance, include specific numbers and trends.
 Format your response as a JSON object with the following structure:
@@ -94,9 +135,12 @@ Format your response as a JSON object with the following structure:
   }
 }
 
+Today's date is March 28, 2025.
+
 User query: ${query}
 
 JSON response:`;
+  }
 }
 
 /**
