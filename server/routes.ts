@@ -9,7 +9,8 @@ import {
   insertTransactionSchema, 
   insertReportSchema,
   insertAnomalySchema,
-  transactions
+  transactions,
+  categories
 } from "@shared/schema";
 import { createInsertSchema } from "drizzle-zod";
 import { ZodError } from "zod";
@@ -135,6 +136,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const count = Number(transactionCount[0].count);
     const hasData = count > 0;
     
+    // Log for debugging
+    console.log(`Revenue forecast endpoint - Transaction count: ${count}, hasData: ${hasData}`);
+    
     if (!hasData) {
       // Return empty data
       const data = {
@@ -146,47 +150,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(200).json({ success: true, data, noData: true });
     }
     
-    // Get actual revenue data from this year
+    // Get transactions joined with categories to determine income vs expense
+    const txWithCategories = await db
+      .select({
+        txId: transactions.id,
+        txAmount: transactions.amount,
+        txDate: transactions.date,
+        categoryId: transactions.categoryId
+      })
+      .from(transactions);
+    
+    // Get all categories to determine type based on name
+    const categoriesList = await db.select().from(categories);
+    const categoryNameMap = Object.fromEntries(
+      categoriesList.map(cat => [cat.id, cat.name?.toLowerCase() || ''])
+    );
+    
+    // Current year data
     const currentYear = new Date().getFullYear();
     const startOfThisYear = new Date(currentYear, 0, 1);
     
-    // Get monthly income for the current year grouped by month
-    const monthlyRevenueResult = await db
-      .select({
-        month: sql`EXTRACT(MONTH FROM date)::integer`,
-        value: sql`SUM(CAST(amount AS DECIMAL))`
-      })
-      .from(transactions)
-      .where(
-        and(
-          eq(transactions.type, 'income'),
-          gte(transactions.date, startOfThisYear)
-        )
-      )
-      .groupBy(sql`EXTRACT(MONTH FROM date)::integer`)
-      .orderBy(sql`EXTRACT(MONTH FROM date)::integer`);
-    
-    // Get revenue data from previous year if available
+    // Previous year data
     const lastYear = currentYear - 1;
     const startOfLastYear = new Date(lastYear, 0, 1);
     const endOfLastYear = new Date(lastYear, 11, 31);
     
-    // Get monthly income for the previous year grouped by month
-    const lastYearRevenueResult = await db
-      .select({
-        month: sql`EXTRACT(MONTH FROM date)::integer`,
-        value: sql`SUM(CAST(amount AS DECIMAL))`
-      })
-      .from(transactions)
-      .where(
-        and(
-          eq(transactions.type, 'income'),
-          gte(transactions.date, startOfLastYear),
-          lte(transactions.date, endOfLastYear)
-        )
-      )
-      .groupBy(sql`EXTRACT(MONTH FROM date)::integer`)
-      .orderBy(sql`EXTRACT(MONTH FROM date)::integer`);
+    // Filter transactions by category (income) and group by month
+    const currentYearIncomeByMonth = new Array(12).fill(0);
+    const previousYearIncomeByMonth = new Array(12).fill(0);
+    
+    // Process all transactions
+    txWithCategories.forEach(tx => {
+      if (!tx.txDate) return;
+      
+      const txDate = new Date(tx.txDate);
+      const categoryName = tx.categoryId ? (categoryNameMap[tx.categoryId] || '') : '';
+      const isIncome = categoryName.includes('income') || 
+                       categoryName.includes('revenue') || 
+                       categoryName.includes('sales');
+      
+      // Skip if not income
+      if (!isIncome) return;
+      
+      const txAmount = Number(tx.txAmount || 0);
+      const txYear = txDate.getFullYear();
+      const txMonth = txDate.getMonth(); // 0-based
+      
+      // Add to current year data
+      if (txYear === currentYear) {
+        currentYearIncomeByMonth[txMonth] += txAmount;
+      } 
+      // Add to previous year data
+      else if (txYear === lastYear) {
+        previousYearIncomeByMonth[txMonth] += txAmount;
+      }
+    });
     
     // Initialize arrays with null values for all months
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -194,16 +212,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const previousYear = Array(12).fill(null);
     const forecast = Array(12).fill(null);
     
-    // Fill in actual data where we have it
-    for (const item of monthlyRevenueResult) {
-      const monthIndex = Number(item.month) - 1; // Convert 1-based month to 0-based index
-      actual[monthIndex] = Math.round(Number(item.value));
-    }
-    
-    // Fill in previous year data where we have it
-    for (const item of lastYearRevenueResult) {
-      const monthIndex = Number(item.month) - 1; // Convert 1-based month to 0-based index
-      previousYear[monthIndex] = Math.round(Number(item.value));
+    // Fill in actual data from our calculated arrays
+    for (let i = 0; i < 12; i++) {
+      const monthValue = currentYearIncomeByMonth[i];
+      if (monthValue > 0) {
+        actual[i] = Math.round(monthValue);
+      }
+      
+      const prevYearValue = previousYearIncomeByMonth[i];
+      if (prevYearValue > 0) {
+        previousYear[i] = Math.round(prevYearValue);
+      }
     }
     
     // Generate forecast for future months
@@ -268,6 +287,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const count = Number(transactionCount[0].count);
     const hasData = count > 0;
     
+    // Log for debugging
+    console.log(`Revenue by region endpoint - Transaction count: ${count}, hasData: ${hasData}`);
+    
     if (!hasData) {
       // Return empty data
       return res.status(200).json({ 
@@ -277,31 +299,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
     
-    // Get income transactions by tag, which we'll use as "regions"
-    // We're using transaction tags as regions for this demo
-    const tagResult = await db
+    // Get transactions with tags
+    const txWithTags = await db
       .select({
-        tag: sql`unnest(tags)`,
-        total: sql`SUM(CAST(amount AS DECIMAL))`
+        txAmount: transactions.amount,
+        txTags: transactions.tags,
+        categoryId: transactions.categoryId
       })
-      .from(transactions)
-      .where(eq(transactions.type, 'income'))
-      .groupBy(sql`unnest(tags)`)
-      .orderBy(sql`SUM(CAST(amount AS DECIMAL)) DESC`);
+      .from(transactions);
+    
+    // Get all categories to determine type based on name
+    const categoriesList = await db.select().from(categories);
+    const categoryNameMap: Record<number, string> = {};
+    
+    // Add each category to the map, ensuring all keys are valid numbers
+    categoriesList.forEach(cat => {
+      if (cat.id !== null && cat.id !== undefined) {
+        categoryNameMap[cat.id] = (cat.name || '').toLowerCase();
+      }
+    });
+    
+    // Group income transactions by tag (region)
+    const tagTotals: Record<string, number> = {};
+    
+    txWithTags.forEach(tx => {
+      // Skip if no tags
+      if (!tx.txTags || tx.txTags.length === 0) return;
+      
+      // Determine if this is income based on category
+      const categoryName = tx.categoryId ? (categoryNameMap[tx.categoryId] || '') : '';
+      const isIncome = categoryName.includes('income') || 
+                       categoryName.includes('revenue') || 
+                       categoryName.includes('sales');
+      
+      // Skip if not income
+      if (!isIncome) return;
+      
+      // Add amount to each tag
+      const txAmount = Number(tx.txAmount || 0);
+      tx.txTags.forEach(tag => {
+        if (!tag) return;
+        if (!tagTotals[tag]) {
+          tagTotals[tag] = 0;
+        }
+        tagTotals[tag] += txAmount;
+      });
+    });
+    
+    // Convert to array of regions
+    const regions = Object.entries(tagTotals).map(([tag, total]) => ({
+      name: tag || 'Uncategorized',
+      value: total
+    }));
+    
+    // Sort by value descending
+    regions.sort((a, b) => b.value - a.value);
     
     // Process results - if we have tags, use them as regions
-    if (tagResult && tagResult.length > 0) {
-      const data = tagResult.map(item => ({
-        name: item.tag || 'Uncategorized',
-        value: Number(item.total)
-      }));
-      
+    if (regions.length > 0) {
       // Calculate total to create percentages
-      const total = data.reduce((sum, item) => sum + item.value, 0);
+      const total = regions.reduce((sum, item) => sum + item.value, 0);
       
       // Convert to percentages and round
-      const dataWithPercentages = data.map(item => ({
-        name: item.name || 'Uncategorized',
+      const dataWithPercentages = regions.map(item => ({
+        name: item.name,
         value: Math.round((item.value / total) * 100)
       }));
       
@@ -324,6 +385,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Check if we have any transactions in the database
     const transactionCount = await db.select({ count: sql`count(*)` }).from(transactions);
     const count = Number(transactionCount[0].count);
+    
+    // Directly get a list of transactions to verify they exist
+    const allTransactions = await db.select().from(transactions).limit(5);
+    console.log(`Key metrics endpoint - Transaction count from query: ${count}`);
+    console.log(`First few transactions:`, JSON.stringify(allTransactions.slice(0, 2)));
+    
     const hasData = count > 0;
     
     if (!hasData) {
@@ -348,22 +415,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(200).json({ success: true, data, noData: true });
     }
     
-    // If there is data, calculate real metrics based on transactions
-    // Get income transactions (sum)
-    const incomeResult = await db
-      .select({ total: sql`SUM(CAST(amount AS DECIMAL))` })
-      .from(transactions)
-      .where(eq(transactions.type, 'income'));
+    // If there is data, calculate real metrics based on transactions and categories
+    // Get transactions joined with categories to determine income vs expense
+    const txWithCategories = await db
+      .select({
+        txId: transactions.id,
+        txAmount: transactions.amount,
+        txDate: transactions.date,
+        categoryId: transactions.categoryId
+      })
+      .from(transactions);
     
-    const income = Number(incomeResult[0].total) || 0;
+    // Get all categories to determine type based on name
+    const categoriesList = await db.select().from(categories);
+    const categoryNameMap: Record<number, string> = {};
     
-    // Get expense transactions (sum)
-    const expenseResult = await db
-      .select({ total: sql`SUM(CAST(amount AS DECIMAL))` })
-      .from(transactions)
-      .where(eq(transactions.type, 'expense'));
+    // Add each category to the map, ensuring all keys are valid numbers
+    categoriesList.forEach(cat => {
+      if (cat.id !== null && cat.id !== undefined) {
+        categoryNameMap[cat.id] = (cat.name || '').toLowerCase();
+      }
+    });
     
-    const expenses = Number(expenseResult[0].total) || 0;
+    // Filter income by looking at category names containing "income" or "revenue" or "sales"
+    const incomeTransactions = txWithCategories.filter(tx => {
+      if (!tx.categoryId) return false;
+      const categoryName = categoryNameMap[tx.categoryId] || '';
+      return categoryName.includes('income') || 
+             categoryName.includes('revenue') || 
+             categoryName.includes('sales');
+    });
+    
+    // Sum income transactions
+    const income = incomeTransactions.reduce((sum, tx) => sum + Number(tx.txAmount || 0), 0);
+    
+    // Filter expense transactions (all non-income transactions)
+    const expenseTransactions = txWithCategories.filter(tx => {
+      if (!tx.categoryId) return true; // Default uncategorized to expenses
+      const categoryName = categoryNameMap[tx.categoryId] || '';
+      return !(categoryName.includes('income') || 
+               categoryName.includes('revenue') || 
+               categoryName.includes('sales'));
+    });
+    
+    // Sum expense transactions
+    const expenses = expenseTransactions.reduce((sum, tx) => sum + Number(tx.txAmount), 0);
     
     // Calculate profit margin
     const profitMargin = income > 0 ? ((income - expenses) / income) * 100 : 0;
@@ -372,41 +468,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     
-    // Get monthly income for the last 6 months
-    const monthlyIncome = await db
-      .select({
-        month: sql`to_char(date, 'YYYY-MM')`,
-        total: sql`SUM(CAST(amount AS DECIMAL))`
-      })
-      .from(transactions)
-      .where(
-        and(
-          eq(transactions.type, 'income'),
-          gte(transactions.date, sixMonthsAgo)
-        )
-      )
-      .groupBy(sql`to_char(date, 'YYYY-MM')`)
-      .orderBy(sql`to_char(date, 'YYYY-MM')`);
+    // Group transactions by month
+    interface MonthData {
+      income: number;
+      expense: number;
+    }
     
-    // Get monthly expenses for the last 6 months
-    const monthlyExpenses = await db
-      .select({
-        month: sql`to_char(date, 'YYYY-MM')`,
-        total: sql`SUM(CAST(amount AS DECIMAL))`
-      })
-      .from(transactions)
-      .where(
-        and(
-          eq(transactions.type, 'expense'),
-          gte(transactions.date, sixMonthsAgo)
-        )
-      )
-      .groupBy(sql`to_char(date, 'YYYY-MM')`)
-      .orderBy(sql`to_char(date, 'YYYY-MM')`);
+    const txByMonth: Record<string, MonthData> = {};
     
-    // Create income and expense trends
-    const incomeTrend = monthlyIncome.map(item => Number(item.total) / 1000); // Convert to thousands
-    const expenseTrend = monthlyExpenses.map(item => Number(item.total) / 1000); // Convert to thousands
+    // Group all transactions by month
+    txWithCategories.forEach(tx => {
+      if (tx.txDate && tx.txDate < sixMonthsAgo) return;
+      if (!tx.txDate) return;
+      
+      const txDate = new Date(tx.txDate);
+      const month = `${txDate.getFullYear()}-${(txDate.getMonth() + 1).toString().padStart(2, '0')}`;
+      
+      if (!txByMonth[month]) {
+        txByMonth[month] = { income: 0, expense: 0 };
+      }
+      
+      // Safely check category ID before accessing the map
+      const categoryName = tx.categoryId && categoryNameMap[tx.categoryId] ? categoryNameMap[tx.categoryId] : '';
+      if (categoryName.includes('income') || categoryName.includes('revenue') || categoryName.includes('sales')) {
+        txByMonth[month].income += Number(tx.txAmount || 0);
+      } else {
+        txByMonth[month].expense += Number(tx.txAmount || 0);
+      }
+    });
+    
+    // Sort months chronologically
+    const months = Object.keys(txByMonth).sort();
+    
+    // Create data arrays for trends
+    const monthlyIncome = months.map(month => ({
+      month,
+      total: txByMonth[month].income
+    }));
+    
+    const monthlyExpenses = months.map(month => ({
+      month,
+      total: txByMonth[month].expense
+    }));
+    
+    // Create income and expense trends (convert to thousands for display)
+    const incomeTrend = monthlyIncome.map(item => Number(item.total) / 1000);
+    const expenseTrend = monthlyExpenses.map(item => Number(item.total) / 1000);
     
     // Calculate monthly profit margins for trend
     const profitMarginTrend = monthlyIncome.map((income, i) => {
