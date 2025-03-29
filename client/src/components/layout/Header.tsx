@@ -21,6 +21,7 @@ export default function Header() {
     { name: 'AI', href: '/ai' },
     { name: 'Dashboard', href: '/dashboard' },
     { name: 'Bookkeeping', href: '/bookkeeping' },
+    { name: 'Finance', href: '/finance' },
     { name: 'Pricing', href: '/pricing' },
     { name: 'Resources', href: '/resources' }
   ];

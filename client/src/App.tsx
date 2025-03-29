@@ -1,11 +1,9 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
-import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
-import { Loader2 } from "lucide-react";
 
 // Pages (direct imports)
 import Home from "@/pages/home";
@@ -15,76 +13,33 @@ import Pricing from "@/pages/pricing";
 import Dashboard from "@/pages/dashboard";
 import Demo from "@/pages/demo";
 import Bookkeeping from "@/pages/bookkeeping";
-import AuthPage from "@/pages/auth-page";
+import Finance from "@/pages/finance";
 import NotFound from "@/pages/not-found";
 
-// Protected route component
-const ProtectedRoute = ({ component: Component }) => {
-  const { user, isLoading } = useAuth();
-  const [, navigate] = useLocation();
-  
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-  
-  if (!user) {
-    // Redirect to auth page if not authenticated
-    navigate("/auth");
-    return null;
-  }
-  
-  return <Component />;
-};
+// Define types for route components
+type ComponentType = () => JSX.Element;
 
 function AppRouter() {
-  const { user, isLoading } = useAuth();
-  
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-  
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
       
       <main className="flex-grow">
         <Switch>
-          {/* Public routes */}
+          {/* All routes accessible without auth */}
           <Route path="/product" component={Product} />
           <Route path="/pricing" component={Pricing} />
           <Route path="/demo" component={Demo} />
-          <Route path="/auth" component={AuthPage} />
-          
-          {/* Protected routes */}
-          <Route path="/ai">
-            <ProtectedRoute component={AI} />
-          </Route>
-          
-          <Route path="/dashboard">
-            <ProtectedRoute component={Dashboard} />
-          </Route>
-          
-          <Route path="/bookkeeping">
-            <ProtectedRoute component={Bookkeeping} />
-          </Route>
+          <Route path="/ai" component={AI} />
+          <Route path="/dashboard" component={Dashboard} />
+          <Route path="/bookkeeping" component={Bookkeeping} />
+          <Route path="/finance" component={Finance} />
           
           {/* Home route */}
-          <Route path="/">
-            {user ? <Dashboard /> : <Home />}
-          </Route>
+          <Route path="/" component={Home} />
           
           {/* Fallback route */}
-          <Route>
-            <NotFound />
-          </Route>
+          <Route component={NotFound} />
         </Switch>
       </main>
       
@@ -96,10 +51,8 @@ function AppRouter() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <AppRouter />
-        <Toaster />
-      </AuthProvider>
+      <AppRouter />
+      <Toaster />
     </QueryClientProvider>
   );
 }

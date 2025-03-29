@@ -444,6 +444,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ success: false, error: "Internal server error" });
     }
   });
+  
+  // FP&A Agent endpoint for financial insights
+  app.get("/api/ai/financial-insights/:organizationId", async (req: Request, res: Response) => {
+    try {
+      const organizationId = parseInt(req.params.organizationId, 10);
+      
+      if (isNaN(organizationId)) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Invalid organization ID" 
+        });
+      }
+      
+      const { generateInsights } = await import('./services/fpaAgent');
+      const insights = await generateInsights(organizationId);
+      
+      res.json({ 
+        success: true, 
+        data: insights 
+      });
+    } catch (error) {
+      console.error("Error generating financial insights:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: "Failed to generate financial insights",
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;

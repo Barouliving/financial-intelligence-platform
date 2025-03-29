@@ -15,6 +15,7 @@ interface GenerationOptions {
   model?: string;
   useCache?: boolean;
   parseJson?: boolean;
+  retries?: number;
 }
 
 /**
@@ -34,52 +35,81 @@ export async function generateText(
     topP = 0.95,
     model = DEFAULT_MODEL,
     useCache = true,
+    retries = 2,
   } = options;
 
   // Define the actual text generation function
   const generateTextFn = async (input: string): Promise<string> => {
-    try {
-      console.log(`Generating text using model: ${model}`);
-      console.log(`Prompt length: ${input.length} characters`);
-      
-      // Create a timeout promise that rejects after the configured timeout
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          reject(new Error(`Request to Hugging Face API timed out after ${config.ai.requestTimeout / 1000} seconds`));
-        }, config.ai.requestTimeout);
-      });
-      
-      // Race between the HF request and the timeout
-      const response = await Promise.race([
-        hf.textGeneration({
-          model: model,
-          inputs: input,
-          parameters: {
-            max_new_tokens: maxTokens,
-            temperature: temperature,
-            top_p: topP,
-            return_full_text: false,
-          }
-        }),
-        timeoutPromise
-      ]);
+    let lastError: Error | null = null;
+    let attemptCount = 0;
+    
+    // Implement retry logic for improved reliability
+    // Especially important in Replit's environment where connections can be less stable
+    while (attemptCount <= retries) {
+      try {
+        attemptCount++;
+        console.log(`Generating text using model: ${model} (attempt ${attemptCount})`);
+        console.log(`Prompt length: ${input.length} characters`);
+        
+        // Create a timeout promise that rejects after the configured timeout
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error(`Request to Hugging Face API timed out after ${config.ai.requestTimeout / 1000} seconds`));
+          }, config.ai.requestTimeout);
+        });
+        
+        // Add jitter to retry attempts to avoid thundering herd
+        if (attemptCount > 1) {
+          const jitter = Math.floor(Math.random() * 1000) + 500;
+          await new Promise(resolve => setTimeout(resolve, (attemptCount - 1) * 1500 + jitter));
+        }
+        
+        // Race between the HF request and the timeout
+        const response = await Promise.race([
+          hf.textGeneration({
+            model: model,
+            inputs: input,
+            parameters: {
+              max_new_tokens: maxTokens,
+              temperature: temperature,
+              top_p: topP,
+              return_full_text: false,
+            }
+          }),
+          timeoutPromise
+        ]);
 
-      console.log(`Generated response length: ${response.generated_text.length} characters`);
-      return response.generated_text;
-    } catch (error: unknown) {
-      console.error('Error generating text with Hugging Face:', error);
-      
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      
-      if (errorMessage.includes('timed out')) {
-        throw new Error('The AI model took too long to respond. Please try a simpler query.');
-      } else if (errorMessage.includes('401')) {
-        throw new Error('Authentication error with AI provider. Please check your API token.');
-      } else if (errorMessage.includes('429')) {
-        throw new Error('Too many requests to the AI service. Please try again in a moment.');
-      } else {
-        throw new Error('Failed to generate AI response: ' + errorMessage);
+        console.log(`Generated response length: ${response.generated_text.length} characters`);
+        return response.generated_text;
+      } catch (error: unknown) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        
+        const errorMessage = lastError.message;
+        console.error(`Error on attempt ${attemptCount}/${retries + 1}:`, errorMessage);
+        
+        // Don't retry certain error types
+        if (errorMessage.includes('401') || // Auth error
+            errorMessage.includes('400') || // Bad request
+            attemptCount > retries) {
+          break;
+        }
+        
+        // Continue to next retry attempt
       }
+    }
+    
+    // If we got here, all retries failed
+    const errorMessage = lastError?.message || 'Unknown error';
+    console.error('All retry attempts failed:', errorMessage);
+    
+    if (errorMessage.includes('timed out')) {
+      throw new Error('The AI model took too long to respond. Please try a simpler query.');
+    } else if (errorMessage.includes('401')) {
+      throw new Error('Authentication error with AI provider. Please check your API token.');
+    } else if (errorMessage.includes('429')) {
+      throw new Error('Too many requests to the AI service. Please try again in a moment.');
+    } else {
+      throw new Error('Failed to generate AI response after multiple attempts: ' + errorMessage);
     }
   };
 

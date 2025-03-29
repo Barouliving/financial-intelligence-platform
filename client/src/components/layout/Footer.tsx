@@ -38,23 +38,23 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 mb-12">
           <div className="lg:col-span-2">
             <Link href="/">
-              <a className="inline-block mb-6">
+              <div className="inline-block mb-6">
                 <div className="text-white font-bold text-2xl">Pigment</div>
-              </a>
+              </div>
             </Link>
             <p className="text-gray-400 mb-6">
               Transform how you plan, report and analyze with our AI-powered business planning platform.
             </p>
             <div className="flex space-x-4">
-              <a href="#" aria-label="Facebook" className="text-gray-400 hover:text-white">
+              <div className="text-gray-400 hover:text-white cursor-pointer">
                 <Facebook size={24} />
-              </a>
-              <a href="#" aria-label="Twitter" className="text-gray-400 hover:text-white">
+              </div>
+              <div className="text-gray-400 hover:text-white cursor-pointer">
                 <Twitter size={24} />
-              </a>
-              <a href="#" aria-label="LinkedIn" className="text-gray-400 hover:text-white">
+              </div>
+              <div className="text-gray-400 hover:text-white cursor-pointer">
                 <Linkedin size={24} />
-              </a>
+              </div>
             </div>
           </div>
 
@@ -64,7 +64,7 @@ export default function Footer() {
               {productLinks.map((link) => (
                 <li key={link.name}>
                   <Link href={link.href}>
-                    <a className="text-gray-400 hover:text-white">{link.name}</a>
+                    <div className="text-gray-400 hover:text-white cursor-pointer">{link.name}</div>
                   </Link>
                 </li>
               ))}
@@ -77,7 +77,7 @@ export default function Footer() {
               {resourceLinks.map((link) => (
                 <li key={link.name}>
                   <Link href={link.href}>
-                    <a className="text-gray-400 hover:text-white">{link.name}</a>
+                    <div className="text-gray-400 hover:text-white cursor-pointer">{link.name}</div>
                   </Link>
                 </li>
               ))}
@@ -90,7 +90,7 @@ export default function Footer() {
               {companyLinks.map((link) => (
                 <li key={link.name}>
                   <Link href={link.href}>
-                    <a className="text-gray-400 hover:text-white">{link.name}</a>
+                    <div className="text-gray-400 hover:text-white cursor-pointer">{link.name}</div>
                   </Link>
                 </li>
               ))}
@@ -106,7 +106,7 @@ export default function Footer() {
             <div className="flex space-x-6">
               {legalLinks.map((link) => (
                 <Link key={link.name} href={link.href}>
-                  <a className="text-gray-400 hover:text-white text-sm">{link.name}</a>
+                  <div className="text-gray-400 hover:text-white text-sm cursor-pointer">{link.name}</div>
                 </Link>
               ))}
             </div>
