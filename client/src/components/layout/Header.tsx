@@ -16,7 +16,10 @@ export default function Header() {
 
   const menuItems = [
     { name: 'Product', href: '/product' },
-    { name: 'Dashboard', href: '/dashboard' }
+    { name: 'Dashboard', href: '/dashboard' },
+    { name: 'Bookkeeping', href: '/bookkeeping' },
+    { name: 'Financial Planning', href: '/finance' },
+    { name: 'AI Assistant', href: '/ai' }
   ];
 
   return (

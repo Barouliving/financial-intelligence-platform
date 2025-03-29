@@ -9,6 +9,9 @@ import { AuthProvider } from "@/hooks/use-auth";
 // Pages (direct imports)
 import Product from "@/pages/product";
 import Dashboard from "@/pages/dashboard";
+import Bookkeeping from "@/pages/bookkeeping";
+import Finance from "@/pages/finance";
+import AI from "@/pages/ai";
 import NotFound from "@/pages/not-found";
 
 // Define types for route components
@@ -21,9 +24,12 @@ function AppRouter() {
       
       <main className="flex-grow">
         <Switch>
-          {/* Only include product and dashboard pages */}
+          {/* Client-facing product pages */}
           <Route path="/product" component={Product} />
           <Route path="/dashboard" component={Dashboard} />
+          <Route path="/bookkeeping" component={Bookkeeping} />
+          <Route path="/finance" component={Finance} />
+          <Route path="/ai" component={AI} />
           
           {/* Redirect home to dashboard */}
           <Route path="/">
