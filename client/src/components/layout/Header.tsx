@@ -16,14 +16,7 @@ export default function Header() {
 
   const menuItems = [
     { name: 'Product', href: '/product' },
-    { name: 'Solutions', href: '/solutions' },
-    { name: 'Features', href: '/#features' },
-    { name: 'AI', href: '/ai' },
-    { name: 'Dashboard', href: '/dashboard' },
-    { name: 'Bookkeeping', href: '/bookkeeping' },
-    { name: 'Finance', href: '/finance' },
-    { name: 'Pricing', href: '/pricing' },
-    { name: 'Resources', href: '/resources' }
+    { name: 'Dashboard', href: '/dashboard' }
   ];
 
   return (
@@ -48,9 +41,6 @@ export default function Header() {
           </div>
           <div className="flex items-center">
             <UserMenu />
-            <Link href="/demo">
-              <Button className="ml-4">Get a demo</Button>
-            </Link>
             <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" className="lg:hidden ml-4">
@@ -78,22 +68,6 @@ export default function Header() {
                         </div>
                       </Link>
                     ))}
-                    <Link href="/auth">
-                      <div 
-                        className="text-gray-700 hover:text-primary-500 py-2 font-medium text-lg"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        Log in
-                      </div>
-                    </Link>
-                    <Link href="/demo">
-                      <div 
-                        className="bg-primary-500 text-white px-4 py-2 rounded-lg font-semibold text-lg hover:bg-primary-600 transition-colors mt-4 text-center"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        Get a demo
-                      </div>
-                    </Link>
                   </nav>
                 </div>
               </SheetContent>

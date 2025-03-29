@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -7,14 +7,8 @@ import Footer from "@/components/layout/Footer";
 import { AuthProvider } from "@/hooks/use-auth";
 
 // Pages (direct imports)
-import Home from "@/pages/home";
 import Product from "@/pages/product";
-import AI from "@/pages/ai";
-import Pricing from "@/pages/pricing";
 import Dashboard from "@/pages/dashboard";
-import Demo from "@/pages/demo";
-import Bookkeeping from "@/pages/bookkeeping";
-import Finance from "@/pages/finance";
 import NotFound from "@/pages/not-found";
 
 // Define types for route components
@@ -27,17 +21,14 @@ function AppRouter() {
       
       <main className="flex-grow">
         <Switch>
-          {/* All routes accessible without auth */}
+          {/* Only include product and dashboard pages */}
           <Route path="/product" component={Product} />
-          <Route path="/pricing" component={Pricing} />
-          <Route path="/demo" component={Demo} />
-          <Route path="/ai" component={AI} />
           <Route path="/dashboard" component={Dashboard} />
-          <Route path="/bookkeeping" component={Bookkeeping} />
-          <Route path="/finance" component={Finance} />
           
-          {/* Home route */}
-          <Route path="/" component={Home} />
+          {/* Redirect home to dashboard */}
+          <Route path="/">
+            <Redirect to="/dashboard" />
+          </Route>
           
           {/* Fallback route */}
           <Route component={NotFound} />
