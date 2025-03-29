@@ -16,12 +16,14 @@ import {
   FileText,
   FilePlus,
   Check,
-  AlertCircle
+  AlertCircle,
+  FileSpreadsheet
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import ExcelImport from "@/components/bookkeeping/ExcelImport";
 
 export default function DataImportPanel() {
   const [isUploading, setIsUploading] = useState(false);
@@ -290,6 +292,18 @@ export default function DataImportPanel() {
                 </div>
               </div>
             </div>
+          </TabsContent>
+          
+          {/* Excel Import Tab */}
+          <TabsList className="mt-4 grid grid-cols-1 w-full">
+            <TabsTrigger value="excel">
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+              Excel Import
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="excel" className="mt-4">
+            <ExcelImport organizationId={1} />
           </TabsContent>
         </Tabs>
       </CardContent>
