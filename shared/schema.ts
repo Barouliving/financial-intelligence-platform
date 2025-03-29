@@ -393,21 +393,33 @@ export const insertCategorySchema = createInsertSchema(categories).pick({
 });
 
 // Transactions
-export const insertTransactionSchema = createInsertSchema(transactions).pick({
-  organizationId: true,
-  description: true,
-  amount: true,
-  type: true,
-  date: true,
-  categoryId: true,
-  debitAccountId: true,
-  creditAccountId: true,
-  documentId: true,
-  reference: true,
-  status: true,
-  tags: true,
-  metadata: true
-});
+export const insertTransactionSchema = createInsertSchema(transactions)
+  .pick({
+    organizationId: true,
+    description: true,
+    amount: true,
+    type: true,
+    date: true,
+    categoryId: true,
+    debitAccountId: true,
+    creditAccountId: true,
+    documentId: true,
+    reference: true,
+    status: true,
+    tags: true,
+    metadata: true
+  })
+  .transform((data) => {
+    // Transform date string to Date object if it's a string
+    // This handles both JSON serialized Date objects and ISO strings
+    if (data.date && typeof data.date === 'string') {
+      return {
+        ...data,
+        date: new Date(data.date)
+      };
+    }
+    return data;
+  });
 
 // Anomalies
 export const insertAnomalySchema = createInsertSchema(anomalies).pick({

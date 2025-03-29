@@ -161,8 +161,8 @@ export const importTransactions = async (
         }
       }
       
-      // Find or create account if needed
-      let accountId: number | null = null;
+      // Find or create account if needed - initialize with a sensible default to make TypeScript happy
+      let accountId = 0;
       
       if (tx.account) {
         // Check if account exists
@@ -177,7 +177,9 @@ export const importTransactions = async (
           const newAccountResponse = await apiRequest('POST', '/api/bookkeeping/accounts', {
             name: tx.account,
             organizationId,
-            type: 'bank' // Default to bank account
+            type: 'asset', // Asset account type for bank accounts
+            description: `Created from Excel import`,
+            balance: "0"
           });
           const newAccountData = await newAccountResponse.json();
           
@@ -187,16 +189,89 @@ export const importTransactions = async (
         }
       }
       
-      // Create transaction
+      // Get default accounts if not specified
+      if (accountId === 0) {
+        // Get default cash account
+        const cashResponse = await apiRequest('GET', `/api/bookkeeping/accounts?name=Cash`);
+        const cashData = await cashResponse.json();
+        if (cashData.success && cashData.data.length > 0) {
+          accountId = cashData.data[0].id;
+        } else {
+          throw new Error('No account specified and default Cash account not found');
+        }
+      }
+      
+      // Get expenses account for double-entry bookkeeping
+      // Initialize with a sensible default to make TypeScript happy
+      let expensesAccountId = 0;
+      const expensesResponse = await apiRequest('GET', `/api/bookkeeping/accounts?name=Expenses`);
+      const expensesData = await expensesResponse.json();
+      
+      if (expensesData.success && expensesData.data.length > 0) {
+        expensesAccountId = expensesData.data[0].id;
+      } else {
+        // Create default expenses account if it doesn't exist
+        const newExpenseResponse = await apiRequest('POST', '/api/bookkeeping/accounts', {
+          name: 'Expenses',
+          organizationId,
+          type: 'expense',
+          description: 'General expenses account',
+          balance: "0"
+        });
+        const newExpenseData = await newExpenseResponse.json();
+        
+        if (newExpenseData.success) {
+          expensesAccountId = newExpenseData.data.id;
+        } else {
+          throw new Error('Failed to create default Expenses account');
+        }
+      }
+      
+      // Ensure we have valid account IDs
+      if (!accountId) {
+        throw new Error('Failed to get or create transaction account');
+      }
+      
+      if (!expensesAccountId) {
+        throw new Error('Failed to get or create expenses account');
+      }
+      
+      // Set debit and credit accounts based on transaction type
+      let debitAccountId: number;
+      let creditAccountId: number;
+      
+      if (tx.type === 'expense') {
+        // For expenses: debit expenses account, credit cash/bank account
+        debitAccountId = expensesAccountId;
+        creditAccountId = accountId;
+      } else {
+        // For income: debit cash/bank account, credit income/revenue account
+        debitAccountId = accountId;
+        creditAccountId = expensesAccountId; // Using expenses account as a temporary solution
+      }
+      
+      // Format transaction data to match schema requirements
+      
+      // Convert date string to Date object
+      const txDate = new Date(tx.date);
+      
+      // Create transaction - convert amount to string for numeric field
+      // Convert date to proper format - we need to ensure our date is treated as a Date on the server
+      // Handle this by formatting the date string in a specific way
+      const formattedDate = txDate.toISOString();
+      
       const response = await apiRequest('POST', '/api/bookkeeping/transactions', {
-        date: tx.date,
+        // Cast the string to a Date using new Date() to ensure it's parsed properly on the server
+        date: new Date(formattedDate),
         description: tx.description,
-        amount: tx.amount,
+        amount: tx.amount.toString(), // Convert numeric amount to string as required by schema
         type: tx.type,
-        categoryId,
-        accountId,
+        categoryId: categoryId || undefined,
+        debitAccountId,
+        creditAccountId,
         reference: tx.reference || '',
-        notes: tx.notes || '',
+        // Notes are stored in metadata for transactions
+        metadata: tx.notes ? { notes: tx.notes } : undefined,
         tags: tx.tags ? tx.tags.split(',').map(tag => tag.trim()) : [],
         organizationId,
         status: 'completed'

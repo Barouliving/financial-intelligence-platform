@@ -270,7 +270,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Transaction routes
   app.post("/api/bookkeeping/transactions", async (req: Request, res: Response) => {
     try {
-      const transactionData = insertTransactionSchema.parse(req.body);
+      // Manual validation to handle date conversion correctly
+      const rawData = req.body;
+      
+      // Convert date string to Date object explicitly if needed
+      if (rawData.date && typeof rawData.date === 'string') {
+        try {
+          rawData.date = new Date(rawData.date);
+          if (isNaN(rawData.date.getTime())) {
+            return res.status(400).json({ 
+              success: false, 
+              error: "Invalid date format. Please provide a valid date." 
+            });
+          }
+        } catch (dateError) {
+          return res.status(400).json({ 
+            success: false, 
+            error: "Failed to parse date: " + (dateError instanceof Error ? dateError.message : String(dateError))
+          });
+        }
+      }
+      
+      // Now parse with Zod schema
+      const transactionData = insertTransactionSchema.parse(rawData);
       const transaction = await storage.createTransaction(transactionData);
       res.status(201).json({ success: true, data: transaction });
     } catch (error) {
@@ -332,8 +354,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/bookkeeping/transactions/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
-      const updateData = insertTransactionSchema.partial().parse(req.body);
+      
+      // Manual validation to handle date conversion for updates too
+      const rawData = req.body;
+      
+      // Convert date string to Date object explicitly if needed
+      if (rawData.date && typeof rawData.date === 'string') {
+        try {
+          rawData.date = new Date(rawData.date);
+          if (isNaN(rawData.date.getTime())) {
+            return res.status(400).json({ 
+              success: false, 
+              error: "Invalid date format. Please provide a valid date." 
+            });
+          }
+        } catch (dateError) {
+          return res.status(400).json({ 
+            success: false, 
+            error: "Failed to parse date: " + (dateError instanceof Error ? dateError.message : String(dateError))
+          });
+        }
+      }
+      
+      // Create a copy of the schema without the transform function for partial updates
+      const partialSchema = createInsertSchema(transactions).pick({
+        organizationId: true,
+        description: true,
+        amount: true,
+        type: true,
+        date: true,
+        categoryId: true,
+        debitAccountId: true,
+        creditAccountId: true,
+        documentId: true,
+        reference: true,
+        status: true,
+        tags: true,
+        metadata: true
+      }).partial();
+      
+      const updateData = partialSchema.parse(rawData);
       const transaction = await storage.updateTransaction(id, updateData);
+      
       if (!transaction) {
         return res.status(404).json({ success: false, error: "Transaction not found" });
       }
