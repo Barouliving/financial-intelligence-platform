@@ -1,10 +1,11 @@
-import { Switch, Route, Redirect } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import { Loader2 } from "lucide-react";
 
 // Pages (direct imports)
 import Home from "@/pages/home";
@@ -17,12 +18,37 @@ import Bookkeeping from "@/pages/bookkeeping";
 import AuthPage from "@/pages/auth-page";
 import NotFound from "@/pages/not-found";
 
+// Protected route component
+const ProtectedRoute = ({ component: Component }) => {
+  const { user, isLoading } = useAuth();
+  const [, navigate] = useLocation();
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+  
+  if (!user) {
+    // Redirect to auth page if not authenticated
+    navigate("/auth");
+    return null;
+  }
+  
+  return <Component />;
+};
+
 function AppRouter() {
   const { user, isLoading } = useAuth();
   
-  // Show a simple loading state while checking auth
   if (isLoading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
   
   return (
@@ -37,33 +63,28 @@ function AppRouter() {
           <Route path="/demo" component={Demo} />
           <Route path="/auth" component={AuthPage} />
           
-          {/* Protected routes with conditional access */}
-          {user ? (
-            <>
-              <Route path="/ai" component={AI} />
-              <Route path="/dashboard" component={Dashboard} />
-              <Route path="/bookkeeping" component={Bookkeeping} />
-              <Route path="/">
-                <Redirect to="/dashboard" />
-              </Route>
-            </>
-          ) : (
-            <>
-              <Route path="/ai">
-                <Redirect to="/auth" />
-              </Route>
-              <Route path="/dashboard">
-                <Redirect to="/auth" />
-              </Route>
-              <Route path="/bookkeeping">
-                <Redirect to="/auth" />
-              </Route>
-              <Route path="/" component={Home} />
-            </>
-          )}
+          {/* Protected routes */}
+          <Route path="/ai">
+            <ProtectedRoute component={AI} />
+          </Route>
+          
+          <Route path="/dashboard">
+            <ProtectedRoute component={Dashboard} />
+          </Route>
+          
+          <Route path="/bookkeeping">
+            <ProtectedRoute component={Bookkeeping} />
+          </Route>
+          
+          {/* Home route */}
+          <Route path="/">
+            {user ? <Dashboard /> : <Home />}
+          </Route>
           
           {/* Fallback route */}
-          <Route component={NotFound} />
+          <Route>
+            <NotFound />
+          </Route>
         </Switch>
       </main>
       
