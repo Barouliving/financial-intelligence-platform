@@ -1,7 +1,5 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
 import Dashboard from '@/components/dashboard/Dashboard';
 import AiAssistant from '@/components/ai/AiAssistant';
 import { Button } from '@/components/ui/button';
@@ -16,19 +14,11 @@ export default function DashboardPage() {
   };
   
   if (!showIntro) {
-    return (
-      <div className="flex flex-col min-h-screen">
-        <Header />
-        <Dashboard />
-        <Footer />
-      </div>
-    );
+    return <Dashboard />;
   }
   
   return (
-    <div className="flex flex-col min-h-screen">
-      <Header />
-      
+    <div>
       <main className="flex-grow">
         <section className="py-20 bg-gradient-to-r from-primary-500 to-secondary-500 text-white">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -272,8 +262,6 @@ export default function DashboardPage() {
           </div>
         </section>
       </main>
-      
-      <Footer />
     </div>
   );
 }

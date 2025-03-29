@@ -1,7 +1,5 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
 import { 
   Sparkles, Brain, MessageSquare, LineChart, Zap, 
   ChevronRight, BarChart, PieChart, Lightbulb, ArrowRight,
@@ -96,8 +94,6 @@ export default function AI() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <Header />
-      
       <main className="flex-grow">
         {/* Hero Section */}
         <section className="py-20 bg-gradient-to-r from-accent-500 to-primary-500 text-white">
@@ -484,8 +480,6 @@ export default function AI() {
           </div>
         </section>
       </main>
-      
-      <Footer />
     </div>
   );
 }
