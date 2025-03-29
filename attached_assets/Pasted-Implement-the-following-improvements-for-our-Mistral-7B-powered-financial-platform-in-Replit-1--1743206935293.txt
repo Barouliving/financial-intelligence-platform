@@ -1,0 +1,132 @@
+Implement the following improvements for our Mistral-7B-powered financial platform in Replit:
+
+1. AI Confidence Scoring System
+Requirements:
+
+Add confidence scoring to transaction categorization
+
+Use TF-IDF similarity comparison against historical transactions
+
+Flag low-confidence (<80%) categorizations for human review
+
+Expected Output:
+
+typescript
+Copy
+// Enhanced categorization function in `lib/ai-helpers.ts`  
+export async function categorizeWithConfidence(transaction: Transaction, history: Transaction[]) {  
+  const prompt = `Categorize: "${transaction.description}".  
+  Similar historical transactions: ${JSON.stringify(findSimilarTransactions(transaction, history))}`;  
+
+  const response = await mistral.generate(prompt);  
+  const confidence = calculateTfidfScore(response, history); // 0-1 scale  
+
+  return {  
+    ...response,  
+    confidence,  
+    needsReview: confidence < 0.8,  
+    similarTransactions: findTopMatches(transaction, history, 3)  
+  };  
+}  
+Include:
+
+TF-IDF implementation using natural npm package
+
+Similarity threshold configuration in appConfig.ts
+
+2. FP&A Agent Prompt Engineering
+Requirements:
+
+Generate actionable insights from cash flow data
+
+Use Mistral-7B with structured JSON output
+
+Expected Output:
+
+typescript
+Copy
+// In `services/fpaAgent.ts`  
+const FP_PROMPT_TEMPLATE = `  
+As a financial analyst, analyze:  
+- Monthly Revenue: ${revenue}  
+- Expenses: ${expenses}  
+- Runway: ${runway} months  
+
+Output JSON:  
+{  
+  "insights": [  
+    {"priority": "high/medium/low", "action": string, "metric": string},  
+    ...  
+  ],  
+  "riskScore": 0-100  
+}`;  
+
+export async function generateInsights(tenantId: string) {  
+  const data = await getFinancials(tenantId);  
+  const raw = await mistral.generate(FP_PROMPT_TEMPLATE, { parseJson: true });  
+  return formatInsights(raw); // Adds urgency emojis (❗⏳)  
+}  
+3. Marketplace Task Queue
+Requirements:
+
+BullMQ implementation for freelancer task distribution
+
+Bounty calculation based on transaction amount
+
+Expected Output:
+
+typescript
+Copy
+// In `services/marketplace.ts`  
+const reviewQueue = new Queue('transactions-review', {  
+  connection: { host: process.env.REDIS_URL }  
+});  
+
+export async function createReviewTask(transaction: Transaction) {  
+  await reviewQueue.add('review', {  
+    transactionId: transaction.id,  
+    bounty: Math.min(10, transaction.amount * 0.01), // 1% or $10 max  
+    expiresAt: new Date(Date.now() + 86400000) // 24h expiry  
+  });  
+}  
+
+// Worker implementation  
+new Worker('transactions-review', async (job) => {  
+  await notifyFreelancers(job.data);  
+});  
+4. Replit-Specific Optimization
+Requirements:
+
+LRU cache for Mistral responses
+
+Cold start protection
+
+Expected Output:
+
+typescript
+Copy
+// In `server/cache.ts`  
+import { LRUCache } from 'lru-cache';  
+
+const mistralCache = new LRUCache<string, any>({  
+  max: 1000,  
+  ttl: 3600000, // 1 hour  
+  allowStale: true  
+});  
+
+export async function cachedInference(prompt: string) {  
+  const key = hashPrompt(prompt);  
+  if (mistralCache.has(key)) return mistralCache.get(key);  
+
+  const result = await mistral.generate(prompt);  
+  mistralCache.set(key, result);  
+  return result;  
+}  
+Ghostwriter Instructions:
+Generate complete TypeScript files with error handling
+
+Use Replit-compatible libraries (avoid AWS dependencies)
+
+Include configuration examples in .env.example
+
+Add JSDoc for all key functions

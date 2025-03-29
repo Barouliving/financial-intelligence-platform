@@ -1,16 +1,20 @@
 import { HfInference } from '@huggingface/inference';
+import config from '../client/src/lib/appConfig';
+import { cachedInference } from './cache';
 
 // Initialize Hugging Face client with API token
 const hf = new HfInference(process.env.HF_API_TOKEN);
 
 // Default model to use (Mistral-7B)
-const DEFAULT_MODEL = 'mistralai/Mistral-7B-v0.1';
+const DEFAULT_MODEL = process.env.HF_MODEL_ID || 'mistralai/Mistral-7B-v0.1';
 
 interface GenerationOptions {
   maxTokens?: number;
   temperature?: number;
   topP?: number;
   model?: string;
+  useCache?: boolean;
+  parseJson?: boolean;
 }
 
 /**
@@ -24,55 +28,66 @@ export async function generateText(
   prompt: string, 
   options: GenerationOptions = {}
 ): Promise<string> {
-  try {
-    const {
-      maxTokens = 512,
-      temperature = 0.7,
-      topP = 0.95,
-      model = DEFAULT_MODEL,
-    } = options;
+  const {
+    maxTokens = 512,
+    temperature = 0.7,
+    topP = 0.95,
+    model = DEFAULT_MODEL,
+    useCache = true,
+  } = options;
 
-    console.log(`Generating text using model: ${model}`);
-    console.log(`Prompt length: ${prompt.length} characters`);
-    
-    // Create a timeout promise that rejects after 25 seconds
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
-        reject(new Error('Request to Hugging Face API timed out after 25 seconds'));
-      }, 25000);
-    });
-    
-    // Race between the HF request and the timeout
-    const response = await Promise.race([
-      hf.textGeneration({
-        model: model,
-        inputs: prompt,
-        parameters: {
-          max_new_tokens: maxTokens,
-          temperature: temperature,
-          top_p: topP,
-          return_full_text: false,
-        }
-      }),
-      timeoutPromise
-    ]);
+  // Define the actual text generation function
+  const generateTextFn = async (input: string): Promise<string> => {
+    try {
+      console.log(`Generating text using model: ${model}`);
+      console.log(`Prompt length: ${input.length} characters`);
+      
+      // Create a timeout promise that rejects after the configured timeout
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error(`Request to Hugging Face API timed out after ${config.ai.requestTimeout / 1000} seconds`));
+        }, config.ai.requestTimeout);
+      });
+      
+      // Race between the HF request and the timeout
+      const response = await Promise.race([
+        hf.textGeneration({
+          model: model,
+          inputs: input,
+          parameters: {
+            max_new_tokens: maxTokens,
+            temperature: temperature,
+            top_p: topP,
+            return_full_text: false,
+          }
+        }),
+        timeoutPromise
+      ]);
 
-    console.log(`Generated response length: ${response.generated_text.length} characters`);
-    return response.generated_text;
-  } catch (error: unknown) {
-    console.error('Error generating text with Hugging Face:', error);
-    
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    
-    if (errorMessage.includes('timed out')) {
-      throw new Error('The AI model took too long to respond. Please try a simpler query.');
-    } else if (errorMessage.includes('401')) {
-      throw new Error('Authentication error with AI provider. Please check your API token.');
-    } else if (errorMessage.includes('429')) {
-      throw new Error('Too many requests to the AI service. Please try again in a moment.');
-    } else {
-      throw new Error('Failed to generate AI response: ' + errorMessage);
+      console.log(`Generated response length: ${response.generated_text.length} characters`);
+      return response.generated_text;
+    } catch (error: unknown) {
+      console.error('Error generating text with Hugging Face:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      if (errorMessage.includes('timed out')) {
+        throw new Error('The AI model took too long to respond. Please try a simpler query.');
+      } else if (errorMessage.includes('401')) {
+        throw new Error('Authentication error with AI provider. Please check your API token.');
+      } else if (errorMessage.includes('429')) {
+        throw new Error('Too many requests to the AI service. Please try again in a moment.');
+      } else {
+        throw new Error('Failed to generate AI response: ' + errorMessage);
+      }
     }
+  };
+
+  // Use cache if enabled, otherwise generate directly
+  if (useCache && process.env.ENABLE_LRU_CACHE !== 'false') {
+    return cachedInference(prompt, generateTextFn);
+  } else {
+    return generateTextFn(prompt);
   }
 }
 
@@ -150,15 +165,25 @@ JSON response:`;
  * Process a user query about business data using Hugging Face
  * 
  * @param query The user's business query
+ * @param options Optional configuration for AI generation
  * @returns Structured JSON response with business insights
  */
-export async function processBusinessQuery(query: string): Promise<string> {
+export async function processBusinessQuery(
+  query: string, 
+  options: Partial<GenerationOptions> = {}
+): Promise<string> {
   try {
     const prompt = createBusinessPrompt(query);
-    const rawResponse = await generateText(prompt, {
+    
+    // Merge default options with provided options
+    const generationOptions = {
       maxTokens: 800,
       temperature: 0.3, // Lower temperature for more focused, analytical responses
-    });
+      useCache: true,
+      ...options
+    };
+    
+    const rawResponse = await generateText(prompt, generationOptions);
 
     // Extract JSON response
     let jsonResponse = rawResponse.trim();

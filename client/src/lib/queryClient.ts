@@ -8,14 +8,24 @@ async function throwIfResNotOk(res: Response) {
 }
 
 export async function apiRequest(
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   url: string,
-  options: RequestInit = {},
+  body?: any,
   queryOptions: { on401: UnauthorizedBehavior } = { on401: "throw" }
 ): Promise<Response> {
-  const res = await fetch(url, {
-    ...options,
+  const options: RequestInit = {
+    method,
     credentials: "include",
-  });
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  };
+  
+  if (body !== undefined) {
+    options.body = JSON.stringify(body);
+  }
+  
+  const res = await fetch(url, options);
   
   if (queryOptions.on401 === "returnNull" && res.status === 401) {
     return res;

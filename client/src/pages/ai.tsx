@@ -5,7 +5,7 @@ import Footer from '@/components/layout/Footer';
 import { 
   Sparkles, Brain, MessageSquare, LineChart, Zap, 
   ChevronRight, BarChart, PieChart, Lightbulb, ArrowRight,
-  Wand2
+  Wand2, Database, RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SimpleLineChart } from '@/components/ui/chart';
 import AiAssistant from '@/components/ai/AiAssistant';
+import AiCacheManager from '@/components/ai/AiCacheManager';
 import { Link } from 'wouter';
 
 export default function AI() {
@@ -382,6 +383,76 @@ export default function AI() {
             </motion.div>
             
             <AiAssistant />
+          </div>
+        </section>
+        
+        {/* AI Cache Management Section */}
+        <section className="py-20 bg-gray-50">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+            <motion.div 
+              className="text-center max-w-3xl mx-auto mb-16"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">AI Cache Management</h2>
+              <p className="text-gray-600 text-lg">
+                Optimize AI performance and response times with our intelligent caching system.
+              </p>
+            </motion.div>
+            
+            <div className="max-w-2xl mx-auto">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+              >
+                <AiCacheManager />
+              </motion.div>
+              
+              <motion.div 
+                className="mt-8 bg-white p-6 rounded-lg shadow-sm border border-gray-100"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
+              >
+                <h3 className="text-lg font-semibold mb-3">Benefits of AI Response Caching</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0 mt-1">
+                      <Zap className="h-5 w-5 text-accent-500" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-gray-700 text-sm">Faster response times for common queries</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0 mt-1">
+                      <Database className="h-5 w-5 text-accent-500" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-gray-700 text-sm">Reduced API costs and bandwidth usage</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0 mt-1">
+                      <RefreshCw className="h-5 w-5 text-accent-500" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-gray-700 text-sm">Efficient handling of repeated AI requests</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0 mt-1">
+                      <Brain className="h-5 w-5 text-accent-500" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-gray-700 text-sm">Enhanced AI model performance</p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
           </div>
         </section>
         

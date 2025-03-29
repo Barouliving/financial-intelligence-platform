@@ -13,6 +13,7 @@ import {
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { processBusinessQuery } from "./huggingface";
+import { clearCache, getCacheStats } from "./cache";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Demo Request API
@@ -43,7 +44,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // AI Conversation API
   app.post("/api/ai/conversation", async (req: Request, res: Response) => {
     try {
-      const { query } = req.body;
+      const { query, useCache = true } = req.body;
       
       if (!query) {
         return res.status(400).json({ success: false, error: "Query is required" });
@@ -54,8 +55,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         // Use Hugging Face if API token is available
         if (process.env.HF_API_TOKEN) {
-          console.log("Using Hugging Face for AI response");
-          response = await processBusinessQuery(query);
+          console.log(`Using Hugging Face for AI response (cache ${useCache ? 'enabled' : 'disabled'})`);
+          response = await processBusinessQuery(query, { useCache });
         } else {
           // Fallback to the local mock data
           console.log("Using mock data for AI response (no API token)");
@@ -92,6 +93,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(200).json({ success: true, data: conversations });
     } catch (error) {
       res.status(500).json({ success: false, error: "Internal server error" });
+    }
+  });
+  
+  // AI Cache Management API
+  app.get("/api/ai/cache/stats", async (_req: Request, res: Response) => {
+    try {
+      const stats = getCacheStats();
+      res.status(200).json({ success: true, data: stats });
+    } catch (error) {
+      console.error("Error fetching cache stats:", error);
+      res.status(500).json({ success: false, error: "Failed to get cache statistics" });
+    }
+  });
+  
+  app.post("/api/ai/cache/clear", async (_req: Request, res: Response) => {
+    try {
+      clearCache();
+      res.status(200).json({ 
+        success: true, 
+        message: "AI response cache cleared successfully" 
+      });
+    } catch (error) {
+      console.error("Error clearing cache:", error);
+      res.status(500).json({ success: false, error: "Failed to clear cache" });
     }
   });
 
