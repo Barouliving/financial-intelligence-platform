@@ -71,7 +71,7 @@ export default function AuthPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      navigate("/");
+      navigate("/dashboard");
     }
   }, [user, navigate]);
 
@@ -82,6 +82,7 @@ export default function AuthPage() {
           title: "Login successful",
           description: "Welcome back!",
         });
+        navigate("/dashboard");
       },
     });
   }
@@ -93,6 +94,7 @@ export default function AuthPage() {
           title: "Registration successful",
           description: "Welcome to Pigment!",
         });
+        navigate("/dashboard");
       },
     });
   }
