@@ -770,7 +770,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         organizationId: true,
         description: true,
         amount: true,
-        type: true,
+        // type field doesn't exist in database
+        // type: true,
         date: true,
         categoryId: true,
         debitAccountId: true,

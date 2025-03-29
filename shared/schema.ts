@@ -199,7 +199,8 @@ export const transactions = pgTable("transactions", {
   organizationId: integer("organization_id").notNull().references(() => organizations.id),
   description: text("description").notNull(),
   amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
-  type: text("type").notNull().default("expense"), // income, expense
+  // Note: The 'type' column doesn't exist in the database but is handled by category naming
+  // type: text("type").notNull().default("expense"), // income, expense
   date: timestamp("date", { mode: 'date' }).notNull(),
   categoryId: integer("category_id").references(() => categories.id),
   debitAccountId: integer("debit_account_id").notNull().references(() => accounts.id),
@@ -398,7 +399,8 @@ export const insertTransactionSchema = createInsertSchema(transactions)
     organizationId: true,
     description: true,
     amount: true,
-    type: true,
+    // type field doesn't exist in database
+    // type: true,
     date: true,
     categoryId: true,
     debitAccountId: true,

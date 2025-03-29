@@ -235,7 +235,7 @@ export async function runMigrations() {
     }
     
     // 2. Seed default data if needed
-    await seedDefaultData(db);
+    await seedDefaultData(db, migrationPool);
     
     console.log('Migrations completed successfully');
   } catch (error) {
@@ -247,17 +247,17 @@ export async function runMigrations() {
 }
 
 // Seed default data
-async function seedDefaultData(db: any) {
+async function seedDefaultData(db: any, pool: pg.Pool) {
   console.log('Checking if default data needs to be seeded...');
   
   try {
     // Check if demo organization exists
-    const demoOrgResult = await db.execute(sql`
-      SELECT id FROM organizations WHERE slug = 'demo-org' LIMIT 1
-    `);
+    const demoOrgResult = await pool.query(
+      `SELECT id FROM organizations WHERE slug = 'demo-org' LIMIT 1`
+    );
     
-    const demoOrgExists = demoOrgResult.length > 0;
-    const demoOrgId = demoOrgExists ? demoOrgResult[0]?.id : null;
+    const demoOrgExists = demoOrgResult.rows && demoOrgResult.rows.length > 0;
+    const demoOrgId = demoOrgExists ? Number(demoOrgResult.rows[0].id) : null;
     
     if (demoOrgExists) {
       console.log(`Demo organization already exists with ID: ${demoOrgId}`);
@@ -276,13 +276,26 @@ async function seedDefaultData(db: any) {
       try {
         // Create new demo organization with a unique slug using timestamp
         const uniqueSlug = `demo-org-${Date.now()}`;
-        const demoOrgResult = await db.execute(sql`
-          INSERT INTO organizations (name, slug, plan, status, metadata)
-          VALUES ('Demo Organization', ${uniqueSlug}, 'free', 'active', '{"demo": true}')
-          RETURNING id
-        `);
+        // First, use pg.Pool directly for the insertion to get better result handling
+        const insertResult = await pool.query(
+          'INSERT INTO organizations (name, slug, plan, status, metadata) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+          ['Demo Organization', uniqueSlug, 'free', 'active', JSON.stringify({ demo: true })]
+        );
         
-        orgId = demoOrgResult[0]?.id;
+        // Extract the ID from the result
+        orgId = insertResult.rows && insertResult.rows.length > 0 ? Number(insertResult.rows[0].id) : null;
+        
+        console.log("Insert result:", JSON.stringify(insertResult));
+        
+        // If we still don't have an orgId, make another query to get it
+        if (!orgId) {
+          const getOrgResult = await pool.query(
+            'SELECT id FROM organizations WHERE slug = $1 LIMIT 1', 
+            [uniqueSlug]
+          );
+          orgId = getOrgResult.rows && getOrgResult.rows.length > 0 ? Number(getOrgResult.rows[0].id) : null;
+          console.log("Select result:", JSON.stringify(getOrgResult));
+        }
         console.log(`Created new demo organization with id: ${orgId} and slug: ${uniqueSlug}`);
       } catch (error) {
         console.error("Error creating organization:", error);
@@ -300,30 +313,34 @@ async function seedDefaultData(db: any) {
     let adminId;
     try {
       // 2. Create admin user
-      const existingAdminResult = await db.execute(sql`
-        SELECT id FROM users 
-        WHERE organization_id = ${orgId} AND username = 'admin'
-        LIMIT 1
-      `);
+      const existingAdminResult = await pool.query(
+        `SELECT id FROM users 
+        WHERE organization_id = $1 AND username = $2
+        LIMIT 1`,
+        [orgId, 'admin']
+      );
       
-      if (existingAdminResult.length > 0 && existingAdminResult[0]?.id) {
-        adminId = existingAdminResult[0]?.id;
+      if (existingAdminResult.rows && existingAdminResult.rows.length > 0) {
+        adminId = Number(existingAdminResult.rows[0].id);
         console.log(`Admin user already exists with ID: ${adminId}`);
       } else {
-        const adminUserResult = await db.execute(sql`
-          INSERT INTO users (
+        const adminUserResult = await pool.query(
+          `INSERT INTO users (
             organization_id, email, username, password, 
             first_name, last_name, role, status
           )
           VALUES (
-            ${orgId}, 'admin@example.com', 'admin', 
+            $1, $2, $3, $4, $5, $6, $7, $8
+          )
+          RETURNING id`,
+          [
+            orgId, 'admin@example.com', 'admin', 
             '$2b$10$6QVrliX4SMLHt/m.OW5gF.kZL9vHgkAG2rOLXX0FxW9GQI7/2lBFi', 
             'Admin', 'User', 'admin', 'active'
-          )
-          RETURNING id
-        `);
+          ]
+        );
         
-        adminId = adminUserResult[0]?.id;
+        adminId = adminUserResult.rows && adminUserResult.rows.length > 0 ? Number(adminUserResult.rows[0].id) : null;
         console.log(`Created admin user with ID: ${adminId}`);
       }
     } catch (error) {
@@ -343,16 +360,14 @@ async function seedDefaultData(db: any) {
       
       for (const account of accountTypes) {
         try {
-          await db.execute(sql`
-            INSERT INTO accounts (
+          await pool.query(
+            `INSERT INTO accounts (
               organization_id, name, type, description, status
             )
-            VALUES (
-              ${orgId}, ${account.name}, ${account.type}, 
-              ${account.description}, 'active'
-            )
-            ON CONFLICT (organization_id, name) DO NOTHING
-          `);
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (organization_id, name) DO NOTHING`,
+            [orgId, account.name, account.type, account.description, 'active']
+          );
         } catch (accountError) {
           console.error(`Error creating account ${account.name}:`, accountError);
           // Continue with next account
@@ -380,17 +395,15 @@ async function seedDefaultData(db: any) {
       
       for (const category of categories) {
         try {
-          await db.execute(sql`
-            INSERT INTO categories (
+          await pool.query(
+            `INSERT INTO categories (
               organization_id, name, description, 
               icon, is_system
             )
-            VALUES (
-              ${orgId}, ${category.name}, ${category.description}, 
-              ${category.icon}, TRUE
-            )
-            ON CONFLICT (organization_id, name) DO NOTHING
-          `);
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (organization_id, name) DO NOTHING`,
+            [orgId, category.name, category.description, category.icon, true]
+          );
         } catch (categoryError) {
           console.error(`Error creating category ${category.name}:`, categoryError);
           // Continue with next category
