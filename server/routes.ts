@@ -8,14 +8,18 @@ import {
   insertCategorySchema, 
   insertTransactionSchema, 
   insertReportSchema,
-  insertAnomalySchema
+  insertAnomalySchema,
+  transactions
 } from "@shared/schema";
+import { createInsertSchema } from "drizzle-zod";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { processBusinessQuery } from "./huggingface";
 import { clearCache, getCacheStats } from "./cache";
 import { setupAuth, requireAuth } from "./auth";
 import { resetDatabase } from "./reset-db";
+import { db } from "./db";
+import { sql, and, eq, gte, lte } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes and middleware
@@ -125,18 +129,186 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Forecast API for dashboard data
-  app.get("/api/dashboard/revenue-forecast", (_req: Request, res: Response) => {
-    const data = {
-      months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-      actual: [4200, 4500, 4800, 5100, 5400, 5700, 6000, 6300, null, null, null, null],
-      forecast: [null, null, null, null, null, null, null, 6300, 6600, 6900, 7200, 7500],
-      previousYear: [3800, 4000, 4200, 4400, 4600, 4800, 5000, 5200, 5400, 5600, 5800, 6000]
-    };
+  app.get("/api/dashboard/revenue-forecast", async (_req: Request, res: Response) => {
+    // Check if we have any transactions in the database
+    const transactionCount = await db.select({ count: sql`count(*)` }).from(transactions);
+    const count = Number(transactionCount[0].count);
+    const hasData = count > 0;
+    
+    if (!hasData) {
+      // Return empty data
+      const data = {
+        months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+        actual: [null, null, null, null, null, null, null, null, null, null, null, null],
+        forecast: [null, null, null, null, null, null, null, null, null, null, null, null],
+        previousYear: [null, null, null, null, null, null, null, null, null, null, null, null]
+      };
+      return res.status(200).json({ success: true, data, noData: true });
+    }
+    
+    // Get actual revenue data from this year
+    const currentYear = new Date().getFullYear();
+    const startOfThisYear = new Date(currentYear, 0, 1);
+    
+    // Get monthly income for the current year grouped by month
+    const monthlyRevenueResult = await db
+      .select({
+        month: sql`EXTRACT(MONTH FROM date)::integer`,
+        value: sql`SUM(CAST(amount AS DECIMAL))`
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.type, 'income'),
+          gte(transactions.date, startOfThisYear)
+        )
+      )
+      .groupBy(sql`EXTRACT(MONTH FROM date)::integer`)
+      .orderBy(sql`EXTRACT(MONTH FROM date)::integer`);
+    
+    // Get revenue data from previous year if available
+    const lastYear = currentYear - 1;
+    const startOfLastYear = new Date(lastYear, 0, 1);
+    const endOfLastYear = new Date(lastYear, 11, 31);
+    
+    // Get monthly income for the previous year grouped by month
+    const lastYearRevenueResult = await db
+      .select({
+        month: sql`EXTRACT(MONTH FROM date)::integer`,
+        value: sql`SUM(CAST(amount AS DECIMAL))`
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.type, 'income'),
+          gte(transactions.date, startOfLastYear),
+          lte(transactions.date, endOfLastYear)
+        )
+      )
+      .groupBy(sql`EXTRACT(MONTH FROM date)::integer`)
+      .orderBy(sql`EXTRACT(MONTH FROM date)::integer`);
+    
+    // Initialize arrays with null values for all months
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const actual = Array(12).fill(null);
+    const previousYear = Array(12).fill(null);
+    const forecast = Array(12).fill(null);
+    
+    // Fill in actual data where we have it
+    for (const item of monthlyRevenueResult) {
+      const monthIndex = Number(item.month) - 1; // Convert 1-based month to 0-based index
+      actual[monthIndex] = Math.round(Number(item.value));
+    }
+    
+    // Fill in previous year data where we have it
+    for (const item of lastYearRevenueResult) {
+      const monthIndex = Number(item.month) - 1; // Convert 1-based month to 0-based index
+      previousYear[monthIndex] = Math.round(Number(item.value));
+    }
+    
+    // Generate forecast for future months
+    // Calculate the average growth rate based on available actual data
+    const currentMonth = new Date().getMonth(); // 0-based
+    
+    let growthRate = 0.05; // Default 5% monthly growth
+    let lastActualValue = null;
+    
+    // Find the last month with actual data
+    for (let i = currentMonth; i >= 0; i--) {
+      if (actual[i] !== null) {
+        lastActualValue = actual[i];
+        break;
+      }
+    }
+    
+    // If we have actual data, calculate growth based on available data
+    if (lastActualValue !== null) {
+      let sumGrowth = 0;
+      let countGrowth = 0;
+      
+      // Calculate average month-to-month growth
+      for (let i = 1; i <= currentMonth; i++) {
+        if (actual[i] !== null && actual[i-1] !== null && actual[i-1] > 0) {
+          sumGrowth += (actual[i] / actual[i-1]) - 1;
+          countGrowth++;
+        }
+      }
+      
+      if (countGrowth > 0) {
+        growthRate = sumGrowth / countGrowth;
+        // Cap growth rate between -10% and +20%
+        growthRate = Math.max(-0.1, Math.min(0.2, growthRate));
+      }
+      
+      // Generate forecast starting from current month
+      for (let i = currentMonth; i < 12; i++) {
+        if (i === currentMonth) {
+          // For current month, forecast = last actual * (1 + growth)
+          // but only if we don't already have actual data
+          if (actual[i] === null) {
+            forecast[i] = Math.round(lastActualValue * (1 + growthRate));
+          }
+        } else {
+          // For future months, forecast based on previous month's forecast
+          const prevValue = forecast[i-1] !== null ? forecast[i-1] : 
+                          (actual[i-1] !== null ? actual[i-1] : lastActualValue);
+          forecast[i] = Math.round(prevValue * (1 + growthRate));
+        }
+      }
+    }
+    
+    const data = { months, actual, forecast, previousYear };
     
     res.status(200).json({ success: true, data });
   });
 
-  app.get("/api/dashboard/revenue-by-region", (_req: Request, res: Response) => {
+  app.get("/api/dashboard/revenue-by-region", async (_req: Request, res: Response) => {
+    // Check if we have any transactions in the database
+    const transactionCount = await db.select({ count: sql`count(*)` }).from(transactions);
+    const count = Number(transactionCount[0].count);
+    const hasData = count > 0;
+    
+    if (!hasData) {
+      // Return empty data
+      return res.status(200).json({ 
+        success: true, 
+        data: [], 
+        noData: true 
+      });
+    }
+    
+    // Get income transactions by tag, which we'll use as "regions"
+    // We're using transaction tags as regions for this demo
+    const tagResult = await db
+      .select({
+        tag: sql`unnest(tags)`,
+        total: sql`SUM(CAST(amount AS DECIMAL))`
+      })
+      .from(transactions)
+      .where(eq(transactions.type, 'income'))
+      .groupBy(sql`unnest(tags)`)
+      .orderBy(sql`SUM(CAST(amount AS DECIMAL)) DESC`);
+    
+    // Process results - if we have tags, use them as regions
+    if (tagResult && tagResult.length > 0) {
+      const data = tagResult.map(item => ({
+        name: item.tag || 'Uncategorized',
+        value: Number(item.total)
+      }));
+      
+      // Calculate total to create percentages
+      const total = data.reduce((sum, item) => sum + item.value, 0);
+      
+      // Convert to percentages and round
+      const dataWithPercentages = data.map(item => ({
+        name: item.name || 'Uncategorized',
+        value: Math.round((item.value / total) * 100)
+      }));
+      
+      return res.status(200).json({ success: true, data: dataWithPercentages });
+    }
+    
+    // Fallback to default regions if no tag data is available
     const data = [
       { name: 'North America', value: 45 },
       { name: 'Europe', value: 30 },
@@ -148,22 +320,132 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(200).json({ success: true, data });
   });
 
-  app.get("/api/dashboard/key-metrics", (_req: Request, res: Response) => {
+  app.get("/api/dashboard/key-metrics", async (_req: Request, res: Response) => {
+    // Check if we have any transactions in the database
+    const transactionCount = await db.select({ count: sql`count(*)` }).from(transactions);
+    const count = Number(transactionCount[0].count);
+    const hasData = count > 0;
+    
+    if (!hasData) {
+      // Return empty data
+      const data = {
+        revenue: {
+          value: 0,
+          change: 0,
+          trend: [0, 0, 0, 0, 0, 0]
+        },
+        expenses: {
+          value: 0,
+          change: 0,
+          trend: [0, 0, 0, 0, 0, 0]
+        },
+        profitMargin: {
+          value: 0,
+          change: 0,
+          trend: [0, 0, 0, 0, 0, 0]
+        }
+      };
+      return res.status(200).json({ success: true, data, noData: true });
+    }
+    
+    // If there is data, calculate real metrics based on transactions
+    // Get income transactions (sum)
+    const incomeResult = await db
+      .select({ total: sql`SUM(CAST(amount AS DECIMAL))` })
+      .from(transactions)
+      .where(eq(transactions.type, 'income'));
+    
+    const income = Number(incomeResult[0].total) || 0;
+    
+    // Get expense transactions (sum)
+    const expenseResult = await db
+      .select({ total: sql`SUM(CAST(amount AS DECIMAL))` })
+      .from(transactions)
+      .where(eq(transactions.type, 'expense'));
+    
+    const expenses = Number(expenseResult[0].total) || 0;
+    
+    // Calculate profit margin
+    const profitMargin = income > 0 ? ((income - expenses) / income) * 100 : 0;
+    
+    // Get data for trends (last 6 months of transactions)
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    
+    // Get monthly income for the last 6 months
+    const monthlyIncome = await db
+      .select({
+        month: sql`to_char(date, 'YYYY-MM')`,
+        total: sql`SUM(CAST(amount AS DECIMAL))`
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.type, 'income'),
+          gte(transactions.date, sixMonthsAgo)
+        )
+      )
+      .groupBy(sql`to_char(date, 'YYYY-MM')`)
+      .orderBy(sql`to_char(date, 'YYYY-MM')`);
+    
+    // Get monthly expenses for the last 6 months
+    const monthlyExpenses = await db
+      .select({
+        month: sql`to_char(date, 'YYYY-MM')`,
+        total: sql`SUM(CAST(amount AS DECIMAL))`
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.type, 'expense'),
+          gte(transactions.date, sixMonthsAgo)
+        )
+      )
+      .groupBy(sql`to_char(date, 'YYYY-MM')`)
+      .orderBy(sql`to_char(date, 'YYYY-MM')`);
+    
+    // Create income and expense trends
+    const incomeTrend = monthlyIncome.map(item => Number(item.total) / 1000); // Convert to thousands
+    const expenseTrend = monthlyExpenses.map(item => Number(item.total) / 1000); // Convert to thousands
+    
+    // Calculate monthly profit margins for trend
+    const profitMarginTrend = monthlyIncome.map((income, i) => {
+      const expense = monthlyExpenses[i] ? Number(monthlyExpenses[i].total) : 0;
+      const inc = Number(income.total);
+      return inc > 0 ? ((inc - expense) / inc) * 100 : 0;
+    });
+    
+    // Ensure we have 6 data points (pad with zeros if needed)
+    while (incomeTrend.length < 6) incomeTrend.unshift(0);
+    while (expenseTrend.length < 6) expenseTrend.unshift(0);
+    while (profitMarginTrend.length < 6) profitMarginTrend.unshift(0);
+    
+    // If more than 6, take only the last 6
+    const revenueTrend = incomeTrend.slice(-6);
+    const expensesTrend = expenseTrend.slice(-6);
+    const pmTrend = profitMarginTrend.slice(-6);
+    
+    // Calculate change (compare last value to previous value)
+    const calcChange = (trend: number[]) => {
+      if (trend.length < 2 || trend[trend.length - 2] === 0) return 0;
+      return ((trend[trend.length - 1] - trend[trend.length - 2]) / trend[trend.length - 2]) * 100;
+    };
+    
     const data = {
       revenue: {
-        value: 4.2,
-        change: 12.5,
-        trend: [4.0, 4.1, 4.15, 4.2, 4.25, 4.3]
+        value: income / 1000, // Convert to thousands for display
+        change: calcChange(revenueTrend),
+        trend: revenueTrend
       },
       expenses: {
-        value: 2.8,
-        change: 3.2,
-        trend: [2.6, 2.65, 2.7, 2.75, 2.8, 2.85]
+        value: expenses / 1000, // Convert to thousands for display
+        change: calcChange(expensesTrend),
+        trend: expensesTrend
       },
       profitMargin: {
-        value: 33.4,
-        change: 5.3,
-        trend: [30.1, 31.2, 32.0, 32.8, 33.4, 33.5]
+        value: profitMargin,
+        change: calcChange(pmTrend),
+        trend: pmTrend
       }
     };
     
