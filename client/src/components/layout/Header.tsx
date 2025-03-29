@@ -8,6 +8,7 @@ import {
   SheetTrigger,
   SheetClose
 } from '@/components/ui/sheet';
+import { UserMenu } from './UserMenu';
 
 export default function Header() {
   const [location] = useLocation();
@@ -45,9 +46,7 @@ export default function Header() {
             </nav>
           </div>
           <div className="flex items-center">
-            <Link href="/login">
-              <a className="text-gray-600 hover:text-primary-500 px-4 py-2 text-sm font-medium hidden sm:block">Log in</a>
-            </Link>
+            <UserMenu />
             <Link href="/demo">
               <Button className="ml-4">Get a demo</Button>
             </Link>
@@ -78,7 +77,7 @@ export default function Header() {
                         </a>
                       </Link>
                     ))}
-                    <Link href="/login">
+                    <Link href="/auth">
                       <a 
                         className="text-gray-700 hover:text-primary-500 py-2 font-medium text-lg"
                         onClick={() => setIsMenuOpen(false)}
