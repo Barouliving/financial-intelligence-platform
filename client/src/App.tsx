@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import { AuthProvider } from "@/hooks/use-auth";
 
 // Pages (direct imports)
 import Home from "@/pages/home";
@@ -51,8 +52,10 @@ function AppRouter() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AppRouter />
-      <Toaster />
+      <AuthProvider>
+        <AppRouter />
+        <Toaster />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

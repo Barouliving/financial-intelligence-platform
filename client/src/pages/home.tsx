@@ -7,8 +7,6 @@ import DashboardPreview from '@/components/home/DashboardPreview';
 import Testimonials from '@/components/home/Testimonials';
 import Pricing from '@/components/home/Pricing';
 import CtaSection from '@/components/home/CtaSection';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
 import { useAuth } from '@/hooks/use-auth';
 
 export default function Home() {
@@ -23,18 +21,14 @@ export default function Home() {
   }, [user, navigate]);
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <Header />
-      <main className="flex-grow">
-        <Hero />
-        <Features />
-        <AiFeatures />
-        <DashboardPreview />
-        <Testimonials />
-        <Pricing />
-        <CtaSection />
-      </main>
-      <Footer />
-    </div>
+    <>
+      <Hero />
+      <Features />
+      <AiFeatures />
+      <DashboardPreview />
+      <Testimonials />
+      <Pricing />
+      <CtaSection />
+    </>
   );
 }
