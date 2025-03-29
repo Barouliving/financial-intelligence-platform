@@ -14,8 +14,11 @@ import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { processBusinessQuery } from "./huggingface";
 import { clearCache, getCacheStats } from "./cache";
+import { setupAuth, requireAuth } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Set up authentication routes and middleware
+  setupAuth(app);
   // Demo Request API
   app.post("/api/demo-request", async (req: Request, res: Response) => {
     try {

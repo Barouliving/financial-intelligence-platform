@@ -12,6 +12,8 @@ import {
 } from "@shared/schema";
 
 import session from "express-session";
+import createMemoryStore from "memorystore";
+import { randomUUID } from "crypto";
 
 export interface IStorage {
   // Session management
@@ -19,8 +21,12 @@ export interface IStorage {
   
   // Users
   getUser(id: number): Promise<User | undefined>;
+  getUsers(organizationId?: number): Promise<User[]>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: number, updates: Partial<InsertUser>): Promise<User | undefined>;
+  updateUserLastLogin(id: number): Promise<void>;
   
   // Organizations
   getOrganization?(id: number): Promise<Organization | undefined>;
@@ -101,8 +107,12 @@ export class MemStorage implements IStorage {
   private currentTransactionId: number;
   private currentAnomalyId: number;
   private currentReportId: number;
+  
+  // Session store for authentication
+  public sessionStore: session.Store;
 
   constructor() {
+    // Initialize collections
     this.users = new Map();
     this.demoRequests = new Map();
     this.aiConversations = new Map();
@@ -112,6 +122,7 @@ export class MemStorage implements IStorage {
     this.anomalies = new Map();
     this.reports = new Map();
     
+    // Initialize IDs
     this.currentUserId = 1;
     this.currentDemoRequestId = 1;
     this.currentAiConversationId = 1;
@@ -120,6 +131,12 @@ export class MemStorage implements IStorage {
     this.currentTransactionId = 1;
     this.currentAnomalyId = 1;
     this.currentReportId = 1;
+    
+    // Initialize session store
+    const MemoryStore = createMemoryStore(session);
+    this.sessionStore = new MemoryStore({
+      checkPeriod: 86400000, // Prune expired entries every 24h
+    });
     
     // Initialize with some default categories
     this.initializeDefaultCategories();
@@ -147,17 +164,61 @@ export class MemStorage implements IStorage {
     return this.users.get(id);
   }
 
+  async getUsers(organizationId?: number): Promise<User[]> {
+    const users = Array.from(this.users.values());
+    if (organizationId) {
+      return users.filter(user => user.organizationId === organizationId);
+    }
+    return users;
+  }
+
   async getUserByUsername(username: string): Promise<User | undefined> {
     return Array.from(this.users.values()).find(
       (user) => user.username === username,
     );
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      (user) => user.email === email,
+    );
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = this.currentUserId++;
-    const user: User = { ...insertUser, id };
+    const now = new Date();
+    const user: User = { 
+      ...insertUser, 
+      id,
+      uuid: insertUser.uuid || crypto.randomUUID(),
+      createdAt: now,
+      updatedAt: now,
+      lastLoginAt: null
+    };
     this.users.set(id, user);
     return user;
+  }
+
+  async updateUser(id: number, updates: Partial<InsertUser>): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (!user) return undefined;
+    
+    const updatedUser: User = {
+      ...user,
+      ...updates,
+      updatedAt: new Date()
+    };
+    this.users.set(id, updatedUser);
+    return updatedUser;
+  }
+
+  async updateUserLastLogin(id: number): Promise<void> {
+    const user = this.users.get(id);
+    if (user) {
+      user.lastLoginAt = new Date();
+      user.updatedAt = new Date();
+      this.users.set(id, user);
+    }
   }
 
   async createDemoRequest(insertDemoRequest: InsertDemoRequest): Promise<DemoRequest> {
@@ -646,4 +707,4 @@ export class MemStorage implements IStorage {
 import { DatabaseStorage } from "./database-storage";
 
 // Create instance of DatabaseStorage as the application's storage provider
-export const storage = new DatabaseStorage();
+export const storage = new MemStorage();
