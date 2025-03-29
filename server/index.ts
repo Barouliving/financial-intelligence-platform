@@ -89,7 +89,7 @@ app.use((req, res, next) => {
       log(`serving on port ${port}`);
     });
   } catch (error) {
-    log(`Fatal error during server initialization: ${error.message}`);
+    log(`Fatal error during server initialization: ${error instanceof Error ? error.message : String(error)}`);
     console.error(error);
     process.exit(1);
   }

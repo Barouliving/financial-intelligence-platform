@@ -25,9 +25,9 @@ import {
   documents
 } from "@shared/schema";
 import { eq, and, between, or, desc, sql, asc, inArray, isNull } from "drizzle-orm";
-import connectPg from "connect-pg-simple";
 import session from "express-session";
 import { pool } from "./db";
+import connect from "connect-pg-simple";
 
 // Define the session store for express-session
 declare module "express-session" {
@@ -38,7 +38,7 @@ declare module "express-session" {
 }
 
 // PostgreSQL session store
-const PostgresSessionStore = connectPg(session);
+const PostgresSessionStore = connect(session);
 
 export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;

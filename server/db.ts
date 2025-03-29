@@ -1,12 +1,9 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import ws from "ws";
+import pg from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from "@shared/schema";
 import { sql } from 'drizzle-orm';
 
-// Configure Neon for serverless environments
-neonConfig.webSocketConstructor = ws;
+const { Pool } = pg;
 
 // Validate database connection URL
 if (!process.env.DATABASE_URL) {
@@ -21,7 +18,8 @@ const poolConfig = {
   max: 20, // Maximum number of clients the pool should contain
   idleTimeoutMillis: 30000, // How long a client is allowed to remain idle before being closed
   connectionTimeoutMillis: 5000, // Maximum time to wait for connection
-  ssl: process.env.NODE_ENV === 'production', // Enable SSL in production
+  // Don't use SSL for local development
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 };
 
 // Create connection pool
@@ -30,17 +28,27 @@ export const pool = new Pool(poolConfig);
 // Set up connection error handling
 pool.on('error', (err) => {
   console.error('Unexpected error on idle client', err);
-  process.exit(-1);
+  console.error(err.stack);
 });
 
 // Initialize Drizzle ORM with our schema
-export const db: NodePgDatabase<typeof schema> = drizzle(pool, { schema });
+export const db = drizzle(pool, { schema });
 
 // Health check function
 export async function checkDatabaseConnection(): Promise<boolean> {
   try {
     const result = await db.execute(sql`SELECT 1 as connected`);
-    return result[0]?.connected === 1;
+    if (Array.isArray(result) && result.length > 0) {
+      return result[0]?.connected === 1;
+    }
+    // Using direct pool query as fallback
+    const client = await pool.connect();
+    try {
+      const queryResult = await client.query('SELECT 1 as connected');
+      return queryResult.rows[0]?.connected === 1;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error("Database connection check failed:", error);
     return false;

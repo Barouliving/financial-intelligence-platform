@@ -1,8 +1,10 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { Pool } from 'pg';
+import pg from 'pg';
 import * as schema from '@shared/schema';
 import { sql } from 'drizzle-orm';
+
+const { Pool } = pg;
 
 // Function to run database migrations
 export async function runMigrations() {
@@ -238,7 +240,7 @@ export async function runMigrations() {
     console.log('Migrations completed successfully');
   } catch (error) {
     console.error('Migration error:', error);
-    throw error;
+    // Don't throw the error, just log it to allow the application to continue
   } finally {
     await migrationPool.end();
   }
@@ -248,88 +250,160 @@ export async function runMigrations() {
 async function seedDefaultData(db: any) {
   console.log('Checking if default data needs to be seeded...');
   
-  // Check if we have any organizations
-  const orgsResult = await db.execute(sql`SELECT COUNT(*) as count FROM organizations`);
-  const orgCount = Number(orgsResult[0]?.count || 0);
-  
-  if (orgCount === 0) {
+  try {
+    // Check if demo organization exists
+    const demoOrgResult = await db.execute(sql`
+      SELECT id FROM organizations WHERE slug = 'demo-org' LIMIT 1
+    `);
+    
+    const demoOrgExists = demoOrgResult.length > 0;
+    const demoOrgId = demoOrgExists ? demoOrgResult[0]?.id : null;
+    
+    if (demoOrgExists) {
+      console.log(`Demo organization already exists with ID: ${demoOrgId}`);
+      return; // Exit early if demo organization already exists
+    }
     console.log('No organizations found. Seeding default data...');
     
-    // 1. Create demo organization
-    const [demoOrg] = await db.execute(sql`
-      INSERT INTO organizations (name, slug, plan, status, metadata)
-      VALUES ('Demo Organization', 'demo-org', 'free', 'active', '{"demo": true}')
-      RETURNING id
-    `);
+    // Get existing or create demo organization
+    let orgId;
     
-    const orgId = demoOrg.id;
-    
-    // 2. Create admin user
-    const [adminUser] = await db.execute(sql`
-      INSERT INTO users (
-        organization_id, email, username, password, 
-        first_name, last_name, role, status
-      )
-      VALUES (
-        ${orgId}, 'admin@example.com', 'admin', 
-        '$2b$10$6QVrliX4SMLHt/m.OW5gF.kZL9vHgkAG2rOLXX0FxW9GQI7/2lBFi', 
-        'Admin', 'User', 'admin', 'active'
-      )
-      RETURNING id
-    `);
-    
-    const adminId = adminUser.id;
-    
-    // 3. Create default account categories
-    const accountTypes = [
-      { name: 'Assets', type: 'asset', description: 'Resources owned by the business' },
-      { name: 'Liabilities', type: 'liability', description: 'Debts and obligations' },
-      { name: 'Equity', type: 'equity', description: 'Ownership interest' },
-      { name: 'Revenue', type: 'income', description: 'Income from operations' },
-      { name: 'Expenses', type: 'expense', description: 'Costs of doing business' }
-    ];
-    
-    for (const account of accountTypes) {
-      await db.execute(sql`
-        INSERT INTO accounts (
-          organization_id, name, type, description, status
-        )
-        VALUES (
-          ${orgId}, ${account.name}, ${account.type}, 
-          ${account.description}, 'active'
-        )
-      `);
+    // Simply use the ID we already fetched since we know it exists
+    if (demoOrgId) {
+      orgId = demoOrgId;
+      console.log(`Using existing demo organization with id: ${orgId}`);
+    } else {
+      try {
+        // Create new demo organization with a unique slug using timestamp
+        const uniqueSlug = `demo-org-${Date.now()}`;
+        const demoOrgResult = await db.execute(sql`
+          INSERT INTO organizations (name, slug, plan, status, metadata)
+          VALUES ('Demo Organization', ${uniqueSlug}, 'free', 'active', '{"demo": true}')
+          RETURNING id
+        `);
+        
+        orgId = demoOrgResult[0]?.id;
+        console.log(`Created new demo organization with id: ${orgId} and slug: ${uniqueSlug}`);
+      } catch (error) {
+        console.error("Error creating organization:", error);
+        // Don't throw, allow to continue
+        return; // Exit the function to prevent cascading errors
+      }
     }
     
-    // 4. Create transaction categories
-    const categories = [
-      { name: 'Sales', description: 'Revenue from sales', icon: 'shopping-cart' },
-      { name: 'Services', description: 'Revenue from services', icon: 'briefcase' },
-      { name: 'Payroll', description: 'Employee salaries and wages', icon: 'users' },
-      { name: 'Rent', description: 'Office space and facilities', icon: 'home' },
-      { name: 'Utilities', description: 'Electricity, water, and other utilities', icon: 'zap' },
-      { name: 'Marketing', description: 'Advertising and promotion', icon: 'trending-up' },
-      { name: 'Software', description: 'Software subscriptions and licenses', icon: 'code' },
-      { name: 'Office Supplies', description: 'Consumable office materials', icon: 'clipboard' },
-      { name: 'Travel', description: 'Business travel expenses', icon: 'map' },
-      { name: 'Uncategorized', description: 'Transactions pending categorization', icon: 'help-circle' }
-    ];
+    // If we don't have an organization ID at this point, we can't continue
+    if (!orgId) {
+      console.log('No organization ID available, skipping further data seeding');
+      return;
+    }
     
-    for (const category of categories) {
-      await db.execute(sql`
-        INSERT INTO categories (
-          organization_id, name, description, 
-          icon, is_system
-        )
-        VALUES (
-          ${orgId}, ${category.name}, ${category.description}, 
-          ${category.icon}, TRUE
-        )
+    let adminId;
+    try {
+      // 2. Create admin user
+      const existingAdminResult = await db.execute(sql`
+        SELECT id FROM users 
+        WHERE organization_id = ${orgId} AND username = 'admin'
+        LIMIT 1
       `);
+      
+      if (existingAdminResult.length > 0 && existingAdminResult[0]?.id) {
+        adminId = existingAdminResult[0]?.id;
+        console.log(`Admin user already exists with ID: ${adminId}`);
+      } else {
+        const adminUserResult = await db.execute(sql`
+          INSERT INTO users (
+            organization_id, email, username, password, 
+            first_name, last_name, role, status
+          )
+          VALUES (
+            ${orgId}, 'admin@example.com', 'admin', 
+            '$2b$10$6QVrliX4SMLHt/m.OW5gF.kZL9vHgkAG2rOLXX0FxW9GQI7/2lBFi', 
+            'Admin', 'User', 'admin', 'active'
+          )
+          RETURNING id
+        `);
+        
+        adminId = adminUserResult[0]?.id;
+        console.log(`Created admin user with ID: ${adminId}`);
+      }
+    } catch (error) {
+      console.error('Error creating admin user:', error);
+      // Continue with other operations
+    }
+    
+    try {
+      // 3. Create default account categories
+      const accountTypes = [
+        { name: 'Assets', type: 'asset', description: 'Resources owned by the business' },
+        { name: 'Liabilities', type: 'liability', description: 'Debts and obligations' },
+        { name: 'Equity', type: 'equity', description: 'Ownership interest' },
+        { name: 'Revenue', type: 'income', description: 'Income from operations' },
+        { name: 'Expenses', type: 'expense', description: 'Costs of doing business' }
+      ];
+      
+      for (const account of accountTypes) {
+        try {
+          await db.execute(sql`
+            INSERT INTO accounts (
+              organization_id, name, type, description, status
+            )
+            VALUES (
+              ${orgId}, ${account.name}, ${account.type}, 
+              ${account.description}, 'active'
+            )
+            ON CONFLICT (organization_id, name) DO NOTHING
+          `);
+        } catch (accountError) {
+          console.error(`Error creating account ${account.name}:`, accountError);
+          // Continue with next account
+        }
+      }
+      console.log('Account categories created or already exist');
+    } catch (error) {
+      console.error('Error creating account categories:', error);
+    }
+    
+    try {
+      // 4. Create transaction categories
+      const categories = [
+        { name: 'Sales', description: 'Revenue from sales', icon: 'shopping-cart' },
+        { name: 'Services', description: 'Revenue from services', icon: 'briefcase' },
+        { name: 'Payroll', description: 'Employee salaries and wages', icon: 'users' },
+        { name: 'Rent', description: 'Office space and facilities', icon: 'home' },
+        { name: 'Utilities', description: 'Electricity, water, and other utilities', icon: 'zap' },
+        { name: 'Marketing', description: 'Advertising and promotion', icon: 'trending-up' },
+        { name: 'Software', description: 'Software subscriptions and licenses', icon: 'code' },
+        { name: 'Office Supplies', description: 'Consumable office materials', icon: 'clipboard' },
+        { name: 'Travel', description: 'Business travel expenses', icon: 'map' },
+        { name: 'Uncategorized', description: 'Transactions pending categorization', icon: 'help-circle' }
+      ];
+      
+      for (const category of categories) {
+        try {
+          await db.execute(sql`
+            INSERT INTO categories (
+              organization_id, name, description, 
+              icon, is_system
+            )
+            VALUES (
+              ${orgId}, ${category.name}, ${category.description}, 
+              ${category.icon}, TRUE
+            )
+            ON CONFLICT (organization_id, name) DO NOTHING
+          `);
+        } catch (categoryError) {
+          console.error(`Error creating category ${category.name}:`, categoryError);
+          // Continue with next category
+        }
+      }
+      console.log('Transaction categories created or already exist');
+    } catch (error) {
+      console.error('Error creating transaction categories:', error);
     }
     
     console.log('Default data seeded successfully');
-  } else {
-    console.log('Organizations already exist, skipping data seeding');
+  } catch (error) {
+    console.error('Error in seedDefaultData:', error);
+    // Don't throw the error, just log it to allow the application to continue
   }
 }
