@@ -31,16 +31,16 @@ export default function Header() {
         <div className="flex justify-between items-center py-4">
           <div className="flex items-center">
             <Link href="/">
-              <a className="flex items-center">
+              <div className="flex items-center">
                 <div className="text-primary-500 font-bold text-2xl">Pigment</div>
-              </a>
+              </div>
             </Link>
             <nav className="hidden lg:flex items-center ml-12">
               {menuItems.map((item) => (
                 <Link key={item.name} href={item.href}>
-                  <a className={`text-gray-600 hover:text-primary-500 px-4 py-2 font-medium text-sm ${location === item.href ? 'text-primary-500' : ''}`}>
+                  <div className={`text-gray-600 hover:text-primary-500 px-4 py-2 font-medium text-sm ${location === item.href ? 'text-primary-500' : ''}`}>
                     {item.name}
-                  </a>
+                  </div>
                 </Link>
               ))}
             </nav>
@@ -69,29 +69,29 @@ export default function Header() {
                   <nav className="flex flex-col space-y-4">
                     {menuItems.map((item) => (
                       <Link key={item.name} href={item.href}>
-                        <a 
+                        <div 
                           className={`text-gray-700 hover:text-primary-500 py-2 font-medium text-lg ${location === item.href ? 'text-primary-500' : ''}`}
                           onClick={() => setIsMenuOpen(false)}
                         >
                           {item.name}
-                        </a>
+                        </div>
                       </Link>
                     ))}
                     <Link href="/auth">
-                      <a 
+                      <div 
                         className="text-gray-700 hover:text-primary-500 py-2 font-medium text-lg"
                         onClick={() => setIsMenuOpen(false)}
                       >
                         Log in
-                      </a>
+                      </div>
                     </Link>
                     <Link href="/demo">
-                      <a 
+                      <div 
                         className="bg-primary-500 text-white px-4 py-2 rounded-lg font-semibold text-lg hover:bg-primary-600 transition-colors mt-4 text-center"
                         onClick={() => setIsMenuOpen(false)}
                       >
                         Get a demo
-                      </a>
+                      </div>
                     </Link>
                   </nav>
                 </div>
