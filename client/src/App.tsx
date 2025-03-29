@@ -7,7 +7,6 @@ import Footer from "@/components/layout/Footer";
 import { AuthProvider } from "@/hooks/use-auth";
 
 // Pages (direct imports)
-import Product from "@/pages/product";
 import Dashboard from "@/pages/dashboard";
 import Bookkeeping from "@/pages/bookkeeping";
 import Finance from "@/pages/finance";
@@ -25,7 +24,6 @@ function AppRouter() {
       <main className="flex-grow">
         <Switch>
           {/* Client-facing product pages */}
-          <Route path="/product" component={Product} />
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/bookkeeping" component={Bookkeeping} />
           <Route path="/finance" component={Finance} />

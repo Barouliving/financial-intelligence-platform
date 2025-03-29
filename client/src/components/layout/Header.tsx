@@ -15,7 +15,6 @@ export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const menuItems = [
-    { name: 'Product', href: '/product' },
     { name: 'Dashboard', href: '/dashboard' },
     { name: 'Bookkeeping', href: '/bookkeeping' },
     { name: 'Financial Planning', href: '/finance' },
