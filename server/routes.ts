@@ -15,6 +15,7 @@ import { fromZodError } from "zod-validation-error";
 import { processBusinessQuery } from "./huggingface";
 import { clearCache, getCacheStats } from "./cache";
 import { setupAuth, requireAuth } from "./auth";
+import { resetDatabase } from "./reset-db";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes and middleware
@@ -471,6 +472,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         error: "Failed to generate financial insights",
         message: error instanceof Error ? error.message : String(error)
       });
+    }
+  });
+  
+  // Database reset endpoint for testing
+  app.post("/api/system/reset-database", async (_req: Request, res: Response) => {
+    try {
+      await resetDatabase();
+      res.status(200).json({ 
+        success: true, 
+        message: "Database reset completed successfully" 
+      });
+    } catch (error) {
+      console.error("Error resetting database:", error);
+      res.status(500).json({ success: false, error: "Failed to reset database" });
     }
   });
 
