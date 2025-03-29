@@ -38,28 +38,28 @@ export default function Bookkeeping() {
   // Fetch accounts
   const { data: accounts, isLoading: isLoadingAccounts } = useQuery({
     queryKey: ['/api/bookkeeping/accounts'],
-    queryFn: () => apiRequest('/api/bookkeeping/accounts', { method: 'GET' }, { on401: "returnNull" })
+    queryFn: () => apiRequest('GET', '/api/bookkeeping/accounts', undefined, { on401: "returnNull" })
       .then(res => res.json())
   });
   
   // Fetch categories
   const { data: categories, isLoading: isLoadingCategories } = useQuery({
     queryKey: ['/api/bookkeeping/categories'],
-    queryFn: () => apiRequest('/api/bookkeeping/categories', { method: 'GET' }, { on401: "returnNull" })
+    queryFn: () => apiRequest('GET', '/api/bookkeeping/categories', undefined, { on401: "returnNull" })
       .then(res => res.json())
   });
   
   // Fetch transactions
   const { data: transactions, isLoading: isLoadingTransactions } = useQuery({
     queryKey: ['/api/bookkeeping/transactions'],
-    queryFn: () => apiRequest('/api/bookkeeping/transactions', { method: 'GET' }, { on401: "returnNull" })
+    queryFn: () => apiRequest('GET', '/api/bookkeeping/transactions', undefined, { on401: "returnNull" })
       .then(res => res.json())
   });
   
   // Fetch anomalies
   const { data: anomalies, isLoading: isLoadingAnomalies } = useQuery({
     queryKey: ['/api/bookkeeping/anomalies'],
-    queryFn: () => apiRequest('/api/bookkeeping/anomalies', { method: 'GET' }, { on401: "returnNull" })
+    queryFn: () => apiRequest('GET', '/api/bookkeeping/anomalies', undefined, { on401: "returnNull" })
       .then(res => res.json())
   });
   
@@ -70,13 +70,7 @@ export default function Bookkeeping() {
     
     setIsSubmitting(true);
     try {
-      const response = await apiRequest('/api/ai/conversation', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ query: aiQuery })
-      }, { on401: "returnNull" });
+      const response = await apiRequest('POST', '/api/ai/conversation', { query: aiQuery }, { on401: "returnNull" });
       
       const responseData = await response.json();
       
