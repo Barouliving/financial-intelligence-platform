@@ -23,6 +23,11 @@ import { db } from "./db";
 import { sql, and, eq, gte, lte } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+app.get("/api/test", (_req, res) => {
+  res.json({ message: "Success! Your routes are working." });
+});
+
+  
   // Set up authentication routes and middleware
   setupAuth(app);
   // Demo Request API
